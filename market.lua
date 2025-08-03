@@ -77,56 +77,6 @@ local function loadInstalledScripts()
   end
 end
 
--- Function to clean up scripts that are no longer available
-local function cleanupObsoleteScripts()
-  Log.Write("[Market] Checking for old scripts...")
-
-  -- Get all config keys that start with "installed_"
-  local scriptsToRemove = {}
-  local allConfigKeys = {}
-
-  -- We need to check all installed scripts from config and see if they exist in scriptsData
-  -- First, get all script names from config
-  local configScriptsList = Config.ReadString(CONFIG_FILE, "Market_Scripts", "")
-  if configScriptsList ~= "" then
-    for scriptName in configScriptsList:gmatch("([^,]+)") do
-      local isInstalled = Config.ReadString(CONFIG_FILE, "installed_" .. scriptName, "false")
-      if isInstalled == "true" and not scriptsData[scriptName] then
-        -- This script is installed but no longer in scriptsData
-        table.insert(scriptsToRemove, scriptName)
-      end
-    end
-  end
-
-  -- Remove obsolete scripts
-  for _, scriptName in ipairs(scriptsToRemove) do
-    Log.Write("[Market] Removing old script: " .. scriptName)
-    local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
-
-    -- Delete the file
-    local success = os.remove(filename)
-    if success then
-      Log.Write("[Market] Successfully removed old script file: " .. scriptName)
-    else
-      Log.Write("[Market] Failed to remove file for old script: " .. scriptName)
-    end
-
-    -- Remove from config
-    Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "false")
-    Config.WriteString(CONFIG_FILE, "script_" .. scriptName, "")
-  end
-
-  if #scriptsToRemove > 0 then
-    Log.Write("[Market] Removed " .. tostring(#scriptsToRemove) .. " old scripts")
-    -- Update the scripts list in config to remove obsolete entries
-    saveScriptsData()
-    -- Reload script system if we removed any scripts
-    Engine.ReloadScriptSystem()
-  else
-    Log.Write("[Market] No old scripts found")
-  end
-end
-
 -- Function to update the market script itself
 local function updateMarket()
   Log.Write("[Market] Updating market script...")
@@ -219,8 +169,6 @@ local function fetchScriptsData()
         saveScriptsData()
         -- Load installed scripts from config after fetching data
         loadInstalledScripts()
-        -- Clean up obsolete scripts
-        cleanupObsoleteScripts()
         -- Refresh buttons after fetching data
         createMarketButtons()
         createInstalledButtons()

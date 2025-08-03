@@ -1,1 +1,4 @@
-{"Test": "https://example.com"}
+{
+	"Auto Pudge Hook": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/auto_pudge_hook.lua",
+	"Ward Detector": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/ward_detector.lua"
+}

@@ -1,11 +1,11 @@
 {
 	"Translator": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/translator.lua",
-	"Creep Agro Timer": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/Creep Agro Timer.lua",
+	"Creep Agro Timer": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/Creep%20Agro%20Timer.lua",
 	"Currier_saver": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Currier_saver.lua",
-	"Auto Stance": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto Stance.lua",
-	"Armlet Threshold": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Armlet Threshold.lua",
-	"Auto Interrupt Channeling": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto Interrupt Channeling.lua",
-	"Spirit Breaker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Spirit Breaker.lua",
+	"Auto Stance": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Stance.lua",
+	"Armlet Threshold": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Armlet%20Threshold.lua",
+	"Auto Interrupt Channeling": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Interrupt%20Channeling.lua",
+	"Spirit Breaker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Spirit%20Breaker.lua",
 	"Nt": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/nt.lua",
 	"remnant_helper": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/remnant_helper.lua",
 	"damage_calculators": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/damage_calculators.lua",
@@ -16,5 +16,5 @@
 	"teleport_particle_tracker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/teleport_particle_tracker.lua",
 	"meepo_poof": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/meepo_poof.lua",
 	"armlet": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/armlet.lua",
-	"Techies Mines": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Techies Mines.lua"
+	"Techies Mines": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Techies%20Mines.lua"
 }

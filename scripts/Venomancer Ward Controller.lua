@@ -4,8 +4,8 @@ local menu = Menu.Create("Heroes", "Hero List", "Venomancer", "Main Settings", "
 local switch = menu:Switch("Control Plague Wards", true, "\u{e1ec}")
 
 local hero, player = nil, nil
-local ward_targets = {}    -- [ward] = target
-local ward_last_order = {} -- [ward] = time of last order
+local ward_targets = {}
+local ward_last_order = {}
 
 local function GetPlagueWards()
   local wards = {}
@@ -75,7 +75,6 @@ script.OnUpdate = function()
       if not healing_ward_targeted then
         if not ward_last_order[ward] or (now - ward_last_order[ward]) > 1.0 then
           Player.AttackTarget(player, ward, new_target, false, false, false, "", false)
-          print("Ward", NPC.GetUnitName(ward), "attacking", NPC.GetUnitName(new_target))
           ward_targets[ward] = new_target
           ward_last_order[ward] = now
         end
@@ -86,7 +85,6 @@ script.OnUpdate = function()
     elseif need_new_order and new_target then
       if not ward_last_order[ward] or (now - ward_last_order[ward]) > 1.0 then
         Player.AttackTarget(player, ward, new_target, false, false, false, "", false)
-        print("Ward", NPC.GetUnitName(ward), "attacking", NPC.GetUnitName(new_target))
         ward_targets[ward] = new_target
         ward_last_order[ward] = now
       end

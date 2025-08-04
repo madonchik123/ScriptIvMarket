@@ -16,12 +16,9 @@ end
 
 -- Function to save scripts data to config
 local function saveScriptsData()
-  -- Save each script with its URL
   for scriptName, scriptUrl in pairs(scriptsData) do
     Config.WriteString(CONFIG_FILE, "script_" .. scriptName, scriptUrl)
   end
-
-  -- Save a list of all script names
   local scriptsList = ""
   for scriptName, _ in pairs(scriptsData) do
     if scriptsList == "" then
@@ -37,16 +34,13 @@ end
 local function loadScriptsData()
   scriptsData = {}
   local scriptsList = Config.ReadString(CONFIG_FILE, "Market_Scripts", "")
-
   if scriptsList ~= "" then
-    -- Split the comma-separated list
     for scriptName in scriptsList:gmatch("([^,]+)") do
       local scriptUrl = Config.ReadString(CONFIG_FILE, "script_" .. scriptName, "")
       if scriptUrl ~= "" then
         scriptsData[scriptName] = scriptUrl
       end
     end
-
     local count = 0
     for _ in pairs(scriptsData) do count = count + 1 end
     Log.Write("[Market] Loaded " .. tostring(count) .. " scripts from config")
@@ -58,7 +52,6 @@ local function saveInstalledScripts()
   for scriptName, _ in pairs(installedScripts) do
     Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "true")
   end
-  -- Clear removed scripts from config
   for scriptName, _ in pairs(scriptsData) do
     if not installedScripts[scriptName] then
       Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "false")
@@ -80,19 +73,16 @@ end
 -- Function to update the market script itself
 local function updateMarket()
   Log.Write("[Market] Updating market script...")
-
   local headers = {
     ["User-Agent"] = "Umbrella/1.0",
     ['Connection'] = 'Keep-Alive',
   }
-
   HTTP.Request("GET", MARKET_UPDATE_URL, {
     headers = headers,
   }, function(response)
     if response.code == 200 and response.response then
       local filename = Engine.GetCheatDirectory() .. "/scripts/market.lua"
       local file = io.open(filename, "w")
-
       if file then
         file:write(response.response)
         file:close()
@@ -111,17 +101,14 @@ end
 -- Function to update all installed scripts
 local function updateAllScripts(calledby)
   Log.Write("[Market] Updating all installed scripts...")
-
   for scriptName, _ in pairs(installedScripts) do
     if scriptsData[scriptName] then
       local scriptUrl = scriptsData[scriptName]
       Log.Write("[Market] Updating script: " .. scriptName)
-
       local headers = {
         ["User-Agent"] = "Umbrella/1.0",
         ['Connection'] = 'Keep-Alive',
       }
-
       HTTP.Request("GET", scriptUrl, {
         headers = headers,
       }, function(response)
@@ -149,12 +136,10 @@ end
 -- Function to fetch and parse scripts.json from GitHub
 local function fetchScriptsData()
   Log.Write("[Market] Fetching scripts data...")
-
   local headers = {
     ["User-Agent"] = "Umbrella/1.0",
     ['Connection'] = 'Keep-Alive',
   }
-
   HTTP.Request("GET", SCRIPTS_JSON_URL, {
     headers = headers,
   }, function(response)
@@ -165,14 +150,10 @@ local function fetchScriptsData()
         local count = 0
         for _ in pairs(scriptsData) do count = count + 1 end
         Log.Write("[Market] Successfully fetched " .. tostring(count) .. " scripts")
-        -- Save scripts data to config
         saveScriptsData()
-        -- Load installed scripts from config after fetching data
         loadInstalledScripts()
-        -- Refresh buttons after fetching data
         createMarketButtons()
         createInstalledButtons()
-        -- Auto-update installed scripts if this was called from OnScriptsLoaded
         if next(installedScripts) ~= nil then
           local installedCount = 0
           for _ in pairs(installedScripts) do installedCount = installedCount + 1 end
@@ -191,24 +172,21 @@ end
 -- Function to download and install a script
 local function installScript(scriptName, scriptUrl)
   Log.Write("[Market] Installing script: " .. scriptName)
-
   local headers = {
     ["User-Agent"] = "Umbrella/1.0",
     ['Connection'] = 'Keep-Alive',
   }
-
   HTTP.Request("GET", scriptUrl, {
     headers = headers,
   }, function(response)
     if response.code == 200 and response.response then
       local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
       local file = io.open(filename, "w")
-
       if file then
         file:write(response.response)
         file:close()
         installedScripts[scriptName] = true
-        saveInstalledScripts() -- Save to config
+        saveInstalledScripts()
         Log.Write("[Market] Successfully installed: " .. scriptName)
         Engine.ReloadScriptSystem()
       else
@@ -224,12 +202,10 @@ end
 local function deleteScript(scriptName)
   Log.Write("[Market] Deleting script: " .. scriptName)
   local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
-
-  -- Use os.remove to delete the file
   local success = os.remove(filename)
   if success then
     installedScripts[scriptName] = nil
-    saveInstalledScripts() -- Save to config
+    saveInstalledScripts()
     Log.Write("[Market] Successfully deleted: " .. scriptName)
     Engine.ReloadScriptSystem()
     return true
@@ -251,40 +227,46 @@ local function isScriptInstalled(scriptName)
 end
 
 -- Create menu structure
-local marketMenu = Menu.Create("Scripts", "Main", "Market", "Market")
-local Market = marketMenu:Create("Market")
-local Installed = marketMenu:Create("Installed Scripts")
+local scriptsMenu = Menu.Create("Scripts", "Other", "Market")
+scriptsMenu:Icon("\u{f54e}") -- store
+
+local mainMenu = scriptsMenu:Create("Main")
+mainMenu:Icon("\u{f0c9}") -- bars (menu)
+
+local Market = mainMenu:Create("Market")
+local Installed = mainMenu:Create("Installed Scripts")
 
 -- Create update all button
 local updateAllButton = Installed:Button("Update All Scripts", function()
   updateAllScripts(true)
 end)
+updateAllButton:Icon("\u{f021}") -- sync/refresh
 
 -- Create market update button
 local updateMarketButton = Market:Button("Update Market", function()
   updateMarket()
 end)
+updateMarketButton:Icon("\u{f062}") -- arrow-up
 
 -- Function to create market install buttons
 function createMarketButtons()
-  -- Clear existing buttons by recreating the Market group
-  -- Note: This is a simplified approach - in a real implementation you might want to track buttons
   for scriptName, scriptUrl in pairs(scriptsData) do
     if not isScriptInstalled(scriptName) then
-      Market:Button("Install " .. scriptName, function()
+      local btn = Market:Button("Install " .. scriptName, function()
         installScript(scriptName, scriptUrl)
       end)
+      btn:Icon("\u{f019}")
     end
   end
 end
 
--- Function to create installed script delete buttons
 function createInstalledButtons()
   for scriptName, _ in pairs(scriptsData) do
     if isScriptInstalled(scriptName) then
-      Installed:Button("Delete " .. scriptName, function()
+      local btn = Installed:Button("Delete " .. scriptName, function()
         deleteScript(scriptName)
       end)
+      btn:Icon("\u{f1f8}")
     end
   end
 end
@@ -292,11 +274,8 @@ end
 -- OnScriptsLoaded callback - automatically update all scripts
 market.OnScriptsLoaded = function()
   Log.Write("[Market] Scripts loaded - loading cached data and updating installed scripts...")
-  -- First load scripts data from config
   loadScriptsData()
   loadInstalledScripts()
-
-  -- Then fetch fresh data from GitHub
   fetchScriptsData()
 end
 

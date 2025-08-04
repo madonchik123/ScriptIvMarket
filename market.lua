@@ -243,6 +243,7 @@ end)
 updateAllButton:Icon("\u{f021}") -- sync/refresh
 
 -- Create market update button
+local Label = Market:Label("Больше скриптов в тг https://t.me/ScriptIv")
 local updateMarketButton = Market:Button("Update Market", function()
   updateMarket()
 end)

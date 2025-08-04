@@ -157,6 +157,7 @@ local function fetchScriptsData()
         if next(installedScripts) ~= nil then
           local installedCount = 0
           for _ in pairs(installedScripts) do installedCount = installedCount + 1 end
+          if Engine.IsInGame() then return end
           Log.Write("[Market] Auto-updating " .. tostring(installedCount) .. " installed scripts...")
           updateAllScripts()
         end

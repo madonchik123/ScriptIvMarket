@@ -2,7 +2,7 @@ local script = {}
 
 
 
-local main = Menu.Create("General", "Main", "Techies Mines 2")
+local main = Menu.Create("General", "Main", "Techies Mines")
 
 local menu = main:Create("Main Settings"):Create("Main Settings")
 
@@ -167,3 +167,4 @@ end
 
 
 return script
+

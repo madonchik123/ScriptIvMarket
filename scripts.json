@@ -1,3 +1,20 @@
 {
-	"Empty Script": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/test.lua"
+	"Translator": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/translator.lua",
+	"Creep Agro Timer": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/Creep Agro Timer.lua",
+	"Courier Saver": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Currier_saver.lua",
+	"Auto Stance Troll Warlord": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto Stance.lua",
+	"Armlet Threshold": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Armlet Threshold.lua",
+	"Auto Interrupt Channeling Brewmaster": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto Interrupt Channeling.lua",
+	"Spirit Breaker Aghanim": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Spirit Breaker.lua",
+	"Notification Helper": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/nt.lua",
+	"Ember Spirit Remnant Helper": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/remnant_helper.lua",
+	"Damage Calculator": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/damage_calculators.lua",
+	"Shadow Fiend Combo Extend": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/sf1000-7.lua",
+	"Meepo Clone Saver": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/meepo.lua",
+	"Local Notifications": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/notifi.lua",
+	"Blink Spammer": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/blink_spammer.lua",
+	"Teleport Tracker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/teleport_particle_tracker.lua",
+	"Meepo Poof Farm Jungle": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/meepo_poof.lua",
+	"Armlet Fix": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/armlet.lua",
+	"Techies Mines": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Techies Mines.lua"
 }

@@ -273,6 +273,7 @@ end
 
 -- OnScriptsLoaded callback - automatically update all scripts
 market.OnScriptsLoaded = function()
+  if Engine.IsInGame() then return end
   Log.Write("[Market] Scripts loaded - loading cached data and updating installed scripts...")
   loadScriptsData()
   loadInstalledScripts()

@@ -1,7 +1,5 @@
 local script = {}
 
-local hero = nil
-
 -- Menu
 local menu = Menu.Find("Heroes", "Hero List", "Void Spirit", "Main Settings", "Hero Settings")
 local Keybind = menu:Bind("Auto Remnant Aim", Enum.ButtonCode.KEY_MOUSE5,
@@ -12,6 +10,7 @@ local DrawDebugInfo = menu:Switch("Draw Debug Info", true)
 
 local Font = Render.LoadFont("Arial")
 local lastPositions = {}
+local hero = nil
 
 -- Projects point p onto the line segment from a to b
 local function ProjectPointOnLineSegment(a, b, p)
@@ -354,6 +353,11 @@ script.OnUpdate = function()
     Enum.PlayerOrderIssuer.DOTA_ORDER_ISSUER_PASSED_UNIT_ONLY,
     hero
   )
+end
+
+script.OnGameEnd = function()
+  lastPositions = nil
+  hero = nil
 end
 
 return script

@@ -50,6 +50,8 @@ script.OnDraw = function()
     hero = Heroes.GetLocal()
   end
   if not hero then return end
+  name = NPC.GetUnitName(hero)
+  if name ~= "npc_dota_hero_meepo" then return end
   if not PoofDamageCalculator:Get() then return end
   EnsureFont()
 

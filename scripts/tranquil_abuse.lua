@@ -1,11 +1,9 @@
 local script = {}
 
--- ========= Menu =========
 local root = Menu.Create("General", "Main", "Tranquil Abuse")
 root:Icon("\u{f782}")
 local rootMenu = root:Create("Main")
 
--- General
 local generalGroup = rootMenu:Create("General")
 local Toggle = generalGroup:Switch("Enable", true, "\u{f205}")
 local AbuseWhenOnCooldown = generalGroup:Switch("Abuse When On Cooldown", false, "\u{f078}")
@@ -14,7 +12,6 @@ local DisableAfter = generalGroup:Slider("Disable After", 5, 50, 10, "%d min")
 local IgnoreRadius = generalGroup:Slider("Ignore Enemies Radius", 100, 800, 150, "%d")
 local BlockOrders = generalGroup:Switch("Block Orders During Cycle", false, "\u{f078}")
 
--- Lead
 local realGroup = rootMenu:Create("Real-Time Lead")
 local RealTimeLead = realGroup:Switch("Enable Real-Time Lead", true, "\u{f017}")
 local RTTravelPercent = realGroup:Slider("Travel Time %", 5, 60, 25, "%d%%")
@@ -27,12 +24,10 @@ local manualGroup = rootMenu:Create("Manual Lead")
 local BaseDropLead = manualGroup:Slider("Base Drop Lead", 50, 400, 120, "%d ms")
 local PingCompensation = manualGroup:Switch("Ping Compensation", true, "\u{f078}")
 
--- Safety
 local safetyGroup = rootMenu:Create("Safety & Pickup")
 local PickupBuffer = safetyGroup:Slider("Pickup Safety Buffer", 50, 700, 150, "%d ms")
 local ProjectileGrouping = safetyGroup:Slider("Projectile Grouping Window", 40, 300, 170, "%d ms")
 
--- Advanced Timing
 local advGroup = rootMenu:Create("Advanced")
 local ADV_InputLatency = advGroup:Slider("Input Latency", 10, 60, 30, "%d ms")
 local ADV_EarlyFudge = advGroup:Slider("Early Fudge Bias", 10, 40, 25, "%d ms")
@@ -42,7 +37,6 @@ local ADV_PostPickupSuppress = advGroup:Slider("Post-Pickup Suppress", 80, 300, 
 local ADV_UncertaintyBuffer = advGroup:Slider("Impact Uncertainty", 20, 60, 30, "%d ms")
 local ADV_MinDropInterval = advGroup:Slider("Min Drop Interval", 30, 120, 50, "%d ms")
 
--- Debug
 local debugGroup = rootMenu:Create("Debug & Telemetry")
 local DebugMode = debugGroup:Switch("Debug Mode", false, "\u{f188}")
 local LogProjectiles = debugGroup:Switch("Log Projectiles", false, "\u{f188}")
@@ -67,26 +61,21 @@ if Toggle.SetCallback and RealTimeLead.SetCallback then
 end
 ApplyMenuState()
 
--- ========= Locals / State =========
 local player, hero
 local gameTime = 0
 
--- Ping
 local pingSec = 0
 local nextPingRefresh = 0
 local PING_REFRESH_INTERVAL = 0.25
 
--- Windows
 local maxWindows = 16
 local windowsStart, windowsEnd, windowsCount = {}, {}, {}
 local windowsN = 0
 local earliestIdx = 0
 
--- State machine
 local STATE_IDLE, STATE_DROPPING, STATE_READY, STATE_PICKING = 0, 1, 2, 3
 local state = STATE_IDLE
 
--- Drop/pick variables
 local dropAt = 0
 local dropTime = 0
 local itemEntity
@@ -96,11 +85,9 @@ local lastImmediateAttempt = 0
 local lastOrderTime = 0
 local lastDropAttempt = 0
 
--- Tracking current earliest projectile to allow earlier reschedules
 local earliestImpactTime = 0
-local earliestProj = nil -- {src=entity, speed=, dist0=}
+local earliestProj = nil
 
--- Misc constants
 local ORDER_COOLDOWN = 0.010
 local PROJECTILE_CLEANUP_INTERVAL = 0.015
 local nextWindowsCleanup = 0
@@ -108,7 +95,6 @@ local nextWindowsCleanup = 0
 local MIN_PROJECTILE_SPEED = 50
 local DEFAULT_PROJECTILE_SPEED = 900
 
--- ========= Utils =========
 local function DebugLog(msg)
   if DebugMode:Get() then print("[Tranquil] " .. msg) end
 end
@@ -117,7 +103,7 @@ local function GetPingSeconds()
   if not NetChannel or not NetChannel.GetAvgLatency then return 0 end
   local ok, v = pcall(NetChannel.GetAvgLatency)
   if not ok or not v then return 0 end
-  if v > 3 then return math.min(1.0, v / 1000.0) end -- ms->s
+  if v > 3 then return math.min(1.0, v / 1000.0) end
   return math.min(1.0, math.max(0, v))
 end
 
@@ -125,7 +111,6 @@ local function HasTranquils()
   return hero and NPC.HasItem(hero, "item_tranquil_boots")
 end
 
--- ========= Windows =========
 local function RecomputeEarliest()
   earliestIdx = 0
   local best = math.huge
@@ -156,7 +141,6 @@ local function AddWindow(s, e)
     if earliestIdx == 0 or s < windowsStart[earliestIdx] then earliestIdx = windowsN end
     return windowsN
   else
-    -- Replace latest-start window if new is earlier (keep near-future ones)
     local worstIdx, worstStart = 1, windowsStart[1]
     for i = 2, windowsN do
       if windowsStart[i] > worstStart then
@@ -205,7 +189,6 @@ local function IsSafeToPickup(now)
   return true
 end
 
--- ========= Lead / Timing =========
 local function ComputeLead(travelTime, projCount)
   local base = (BaseDropLead:Get() * 0.001) + (ADV_InputLatency:Get() * 0.001) + (ADV_EarlyFudge:Get() * 0.001)
   if not RealTimeLead:Get() then
@@ -232,7 +215,6 @@ local function ComputeLead(travelTime, projCount)
 end
 
 local function GetVerifyDelay()
-  -- Note: this clamps to 0.15 by design (original behavior)
   return math.max(0.15, math.min(0.14, pingSec * 1.2 + 0.035))
 end
 
@@ -240,7 +222,6 @@ local function ClearCycle(now)
   dropAt = 0
   earliestImpactTime = 0
   earliestProj = nil
-  -- keep only future windows
   local eps = 0.005
   local w = 1
   for i = 1, windowsN do
@@ -262,7 +243,6 @@ local function ClearCycle(now)
   RecomputeEarliest()
 end
 
--- ========= Orders =========
 local function DropTranquils(now, priority)
   if not hero or not player then return false end
   if not HasTranquils() then return false end
@@ -338,7 +318,6 @@ local function PickupTranquils(now)
   return false
 end
 
--- ========= OnProjectile =========
 local function GetProjectilePos(data)
   return data.position or data.pos or data.origin or data.startPos or data.start or data.start_position or
       data.spawnOrigin or data.spawn_origin
@@ -357,7 +336,6 @@ script.OnProjectile = function(data)
   local source = data.source
   if not source or Entity.IsSameTeam(hero, source) or not Entity.IsHero(source) then return end
 
-  -- Distance from current projectile pos if available
   local heroPos = Entity.GetAbsOrigin(hero)
   local projPos = GetProjectilePos(data)
   local srcPos = (not projPos) and Entity.GetAbsOrigin(source) or nil
@@ -369,24 +347,19 @@ script.OnProjectile = function(data)
       NPC.GetUnitName(source) or "?", tostring(data.moveSpeed or data.original_move_speed), distance))
   end
 
-  -- New projectile observed -> lift post-pickup suppression immediately (we want to react)
   if now < suppressGuardsUntil then suppressGuardsUntil = now end
 
-  -- Impact time
   local speed = math.max(MIN_PROJECTILE_SPEED, data.moveSpeed or data.original_move_speed or DEFAULT_PROJECTILE_SPEED)
   local impactTime = (data.maxImpactTime and data.maxImpactTime > now) and data.maxImpactTime
       or (data.expireTime and data.expireTime > now) and data.expireTime
       or (now + distance / speed)
 
-  -- Add window
   local uncertainty = ADV_UncertaintyBuffer:Get() * 0.001
   AddWindow(impactTime - uncertainty, impactTime + uncertainty)
 
-  -- Only schedule when boots are on hero and idle
   if state ~= STATE_IDLE or not HasTranquils() then return end
 
   local travel = impactTime - now
-  -- Approx projectile pressure from overlapping windows
   local count = 1
   for i = 1, windowsN do
     if windowsStart[i] <= impactTime + 0.05 and windowsEnd[i] >= now then
@@ -401,7 +374,6 @@ script.OnProjectile = function(data)
   local emergencyWindow = ADV_EmergencyWindow:Get() * 0.001
   local immediateThreshold = ADV_ImmediateThreshold:Get() * 0.001
 
-  -- Emergency: impact soon -> drop right now
   if travel <= emergencyWindow then
     if now - lastImmediateAttempt > 0.010 then
       lastImmediateAttempt = now
@@ -410,14 +382,12 @@ script.OnProjectile = function(data)
     return
   end
 
-  -- Immediate window
   if dropTimeAt <= now + immediateThreshold then
     if now - lastImmediateAttempt > 0.010 then
       lastImmediateAttempt = now
       DropTranquils(now, true)
     end
   else
-    -- Schedule earliest drop
     if dropAt == 0 or dropTimeAt < dropAt - 0.004 then
       dropAt = dropTimeAt
       earliestImpactTime = impactTime
@@ -427,7 +397,6 @@ script.OnProjectile = function(data)
   end
 end
 
--- ========= Update =========
 script.OnUpdate = function()
   hero = hero or Heroes.GetLocal()
   player = player or Players.GetLocal()
@@ -435,7 +404,6 @@ script.OnUpdate = function()
 
   if not hero or not player then return end
 
-  -- Update ping
   if gameTime >= nextPingRefresh then
     nextPingRefresh = gameTime + PING_REFRESH_INTERVAL
     pingSec = PingCompensation:Get() and GetPingSeconds() or 0
@@ -444,18 +412,15 @@ script.OnUpdate = function()
   if not Toggle:Get() then return end
   if DisableAfterToggle:Get() and gameTime >= (DisableAfter:Get() * 60) then return end
 
-  -- Windows cleanup
   if gameTime >= nextWindowsCleanup then
     nextWindowsCleanup = gameTime + PROJECTILE_CLEANUP_INTERVAL
     CleanupWindows(gameTime)
   end
 
-  -- Fire scheduled drop
   if state == STATE_IDLE and HasTranquils() and dropAt > 0 and gameTime >= dropAt then
     DropTranquils(gameTime, true)
   end
 
-  -- If we moved closer to source, reschedule earlier (only earlier)
   if state == STATE_IDLE and HasTranquils() and earliestProj and earliestImpactTime > 0 then
     local src = earliestProj.src
     if src and Entity.IsAlive(src) then
@@ -464,7 +429,6 @@ script.OnUpdate = function()
         local speed = earliestProj.speed or DEFAULT_PROJECTILE_SPEED
         local newImpact = gameTime + (d / speed)
         if newImpact + 0.005 < earliestImpactTime then
-          -- recompute lead with current pressure
           local count = 1
           for i = 1, windowsN do
             if windowsStart[i] <= newImpact + 0.05 and windowsEnd[i] >= gameTime then
@@ -496,7 +460,6 @@ script.OnUpdate = function()
     end
   end
 
-  -- Guard: if a FUTURE window is dangerously close (and not suppressed), force an emergency drop
   if state == STATE_IDLE and HasTranquils() and gameTime >= suppressGuardsUntil and windowsN > 0 then
     local idx = earliestIdx
     if idx ~= 0 then
@@ -509,11 +472,9 @@ script.OnUpdate = function()
     end
   end
 
-  -- State machine
   if state == STATE_DROPPING then
     if gameTime - dropTime >= GetVerifyDelay() then
       if HasTranquils() then
-        -- Drop didn't register, reset
         state = STATE_IDLE
         dropAt = 0
         DebugLog("Drop verify failed (still on hero)")
@@ -521,7 +482,6 @@ script.OnUpdate = function()
         state = STATE_READY
         DebugLog("Drop verified")
       else
-        -- Allow extra search time
         if gameTime - dropTime > 0.6 then
           state = STATE_IDLE
           dropAt = 0
@@ -549,7 +509,6 @@ script.OnUpdate = function()
     end
   elseif state == STATE_PICKING then
     if HasTranquils() then
-      -- Completed cycle
       state = STATE_IDLE
       itemEntity = nil
       suppressGuardsUntil = gameTime + (ADV_PostPickupSuppress:Get() * 0.001)
@@ -569,7 +528,6 @@ script.OnUpdate = function()
   end
 end
 
--- ========= Order blocking =========
 local blocked_orders = {
   [Enum.UnitOrder.DOTA_UNIT_ORDER_MOVE_TO_DIRECTION] = true,
   [Enum.UnitOrder.DOTA_UNIT_ORDER_MOVE_TO_TARGET] = true,

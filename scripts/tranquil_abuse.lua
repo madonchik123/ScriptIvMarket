@@ -17,11 +17,11 @@ local BlockOrders = generalGroup:Switch("Block Orders During Cycle", false, "\u{
 -- Lead
 local realGroup = rootMenu:Create("Real-Time Lead")
 local RealTimeLead = realGroup:Switch("Enable Real-Time Lead", true, "\u{f017}")
-local RTTravelPercent = realGroup:Slider("Travel Time %", 5, 60, 25, function(v) return v .. "%" end)
+local RTTravelPercent = realGroup:Slider("Travel Time %", 5, 60, 25, "%d%%")
 local RTMinLead = realGroup:Slider("Min Lead", 20, 350, 60, "%d ms")
 local RTMaxLead = realGroup:Slider("Max Lead", 80, 650, 650, "%d ms")
 local RTMultiExtra = realGroup:Slider("Extra / Projectile", 0, 200, 30, "%d ms")
-local RTPingScale = realGroup:Slider("Ping Scale %", 0, 150, 60, function(v) return v .. "%" end)
+local RTPingScale = realGroup:Slider("Ping Scale %", 0, 150, 60, "%d%%")
 
 local manualGroup = rootMenu:Create("Manual Lead")
 local BaseDropLead = manualGroup:Slider("Base Drop Lead", 50, 400, 120, "%d ms")
@@ -32,7 +32,7 @@ local safetyGroup = rootMenu:Create("Safety & Pickup")
 local PickupBuffer = safetyGroup:Slider("Pickup Safety Buffer", 50, 700, 150, "%d ms")
 local ProjectileGrouping = safetyGroup:Slider("Projectile Grouping Window", 40, 300, 170, "%d ms")
 
--- Advanced Timing (tunable; cached every tick)
+-- Advanced Timing
 local advGroup = rootMenu:Create("Advanced")
 local ADV_InputLatency = advGroup:Slider("Input Latency", 10, 60, 30, "%d ms")
 local ADV_EarlyFudge = advGroup:Slider("Early Fudge Bias", 10, 40, 25, "%d ms")
@@ -64,15 +64,6 @@ end
 if Toggle.SetCallback and RealTimeLead.SetCallback then
   Toggle:SetCallback(ApplyMenuState)
   RealTimeLead:SetCallback(ApplyMenuState)
-else
-  script._legacyMenuPolling = true
-  local nextMenuStateUpdate = 0
-  script._UpdateMenuStates = function(now)
-    if now >= nextMenuStateUpdate then
-      ApplyMenuState()
-      nextMenuStateUpdate = now + 0.5
-    end
-  end
 end
 ApplyMenuState()
 
@@ -80,40 +71,12 @@ ApplyMenuState()
 local player, hero
 local gameTime = 0
 
--- Config cache (updated each tick)
-local cfg_enabled = true
-local cfg_disableAfter = false
-local cfg_disableAtTime = 0
-local cfg_ignoreRadius = 150
-local cfg_blockOrders = false
-
-local cfg_rtlEnabled = true
-local cfg_rtTravelPct = 0.25
-local cfg_rtMinLead = 0.065
-local cfg_rtMaxLead = 0.260
-local cfg_rtMultiExtra = 0.030
-local cfg_rtPingScale = 0.60
-
-local cfg_baseLead = 0.120
-local cfg_pingComp = true
-
-local cfg_pickupBuffer = 0.180
-local cfg_groupWindow = 0.120
-
-local cfg_inputLatency = 0.030
-local cfg_earlyFudge = 0.025
-local cfg_immediateThreshold = 0.060
-local cfg_emergencyWindow = 0.075
-local cfg_postPickupSuppress = 0.180
-local cfg_uncertainty = 0.030
-local cfg_minDropInterval = 0.050
-
--- Ping (cached)
+-- Ping
 local pingSec = 0
 local nextPingRefresh = 0
 local PING_REFRESH_INTERVAL = 0.25
 
--- Windows (no sorting; linear scan; tiny N)
+-- Windows
 local maxWindows = 16
 local windowsStart, windowsEnd, windowsCount = {}, {}, {}
 local windowsN = 0
@@ -124,15 +87,14 @@ local STATE_IDLE, STATE_DROPPING, STATE_READY, STATE_PICKING = 0, 1, 2, 3
 local state = STATE_IDLE
 
 -- Drop/pick variables
-local dropAt = 0 -- scheduled time
+local dropAt = 0
 local dropTime = 0
-local itemEntity, itemIndex
+local itemEntity
 local retryTime = 0
 local suppressGuardsUntil = 0
 local lastImmediateAttempt = 0
 local lastOrderTime = 0
 local lastDropAttempt = 0
-local lastPickupTime = 0
 
 -- Tracking current earliest projectile to allow earlier reschedules
 local earliestImpactTime = 0
@@ -159,40 +121,6 @@ local function GetPingSeconds()
   return math.min(1.0, math.max(0, v))
 end
 
-local function RefreshConfig(now)
-  cfg_enabled = Toggle:Get()
-  cfg_disableAfter = DisableAfterToggle:Get()
-  cfg_disableAtTime = DisableAfter:Get() * 60
-  cfg_ignoreRadius = IgnoreRadius:Get()
-  cfg_blockOrders = BlockOrders:Get()
-
-  cfg_rtlEnabled = RealTimeLead:Get()
-  cfg_rtTravelPct = RTTravelPercent:Get() * 0.01
-  cfg_rtMinLead = RTMinLead:Get() * 0.001
-  cfg_rtMaxLead = RTMaxLead:Get() * 0.001
-  cfg_rtMultiExtra = RTMultiExtra:Get() * 0.001
-  cfg_rtPingScale = RTPingScale:Get() * 0.01
-
-  cfg_baseLead = BaseDropLead:Get() * 0.001
-  cfg_pingComp = PingCompensation:Get()
-
-  cfg_pickupBuffer = PickupBuffer:Get() * 0.001
-  cfg_groupWindow = ProjectileGrouping:Get() * 0.001
-
-  cfg_inputLatency = ADV_InputLatency:Get() * 0.001
-  cfg_earlyFudge = ADV_EarlyFudge:Get() * 0.001
-  cfg_immediateThreshold = ADV_ImmediateThreshold:Get() * 0.001
-  cfg_emergencyWindow = ADV_EmergencyWindow:Get() * 0.001
-  cfg_postPickupSuppress = ADV_PostPickupSuppress:Get() * 0.001
-  cfg_uncertainty = ADV_UncertaintyBuffer:Get() * 0.001
-  cfg_minDropInterval = ADV_MinDropInterval:Get() * 0.001
-
-  if now >= nextPingRefresh then
-    nextPingRefresh = now + PING_REFRESH_INTERVAL
-    pingSec = cfg_pingComp and GetPingSeconds() or 0
-  end
-end
-
 local function HasTranquils()
   return hero and NPC.HasItem(hero, "item_tranquil_boots")
 end
@@ -210,7 +138,7 @@ local function RecomputeEarliest()
 end
 
 local function AddWindow(s, e)
-  local mergeTol = cfg_groupWindow * 2
+  local mergeTol = (ProjectileGrouping:Get() * 0.001) * 2
   for i = 1, windowsN do
     if s <= windowsEnd[i] + mergeTol and e >= windowsStart[i] - mergeTol then
       if s < windowsStart[i] then windowsStart[i] = s end
@@ -246,7 +174,7 @@ local function AddWindow(s, e)
 end
 
 local function CleanupWindows(now)
-  local cutoff = now - cfg_pickupBuffer
+  local cutoff = now - (PickupBuffer:Get() * 0.001)
   local w = 1
   for i = 1, windowsN do
     if windowsEnd[i] > cutoff then
@@ -268,7 +196,7 @@ local function CleanupWindows(now)
 end
 
 local function IsSafeToPickup(now)
-  local safeTime = now + cfg_pickupBuffer
+  local safeTime = now + (PickupBuffer:Get() * 0.001)
   for i = 1, windowsN do
     if windowsStart[i] <= safeTime and windowsEnd[i] >= now then
       return false
@@ -279,24 +207,32 @@ end
 
 -- ========= Lead / Timing =========
 local function ComputeLead(travelTime, projCount)
-  local base = cfg_baseLead + cfg_inputLatency + cfg_earlyFudge
-  if not cfg_rtlEnabled then
-    return math.min(base + (cfg_pingComp and pingSec or 0), math.max(0, travelTime - 0.01))
+  local base = (BaseDropLead:Get() * 0.001) + (ADV_InputLatency:Get() * 0.001) + (ADV_EarlyFudge:Get() * 0.001)
+  if not RealTimeLead:Get() then
+    local pingPart = PingCompensation:Get() and pingSec or 0
+    return math.min(base + pingPart, math.max(0, travelTime - 0.01))
   end
 
-  local pingPart = (cfg_pingComp and pingSec or 0) * cfg_rtPingScale
-  local lead = base + pingPart + (travelTime * cfg_rtTravelPct) + math.max(0, (projCount or 1) - 1) * cfg_rtMultiExtra
-  if lead < cfg_rtMinLead then lead = cfg_rtMinLead end
-  if lead > cfg_rtMaxLead then lead = cfg_rtMaxLead end
+  local pingPart = (PingCompensation:Get() and pingSec or 0) * (RTPingScale:Get() * 0.01)
+  local lead = base
+      + pingPart
+      + (travelTime * (RTTravelPercent:Get() * 0.01))
+      + math.max(0, (projCount or 1) - 1) * (RTMultiExtra:Get() * 0.001)
+
+  local minLead = RTMinLead:Get() * 0.001
+  local maxLead = RTMaxLead:Get() * 0.001
+  if lead < minLead then lead = minLead end
+  if lead > maxLead then lead = maxLead end
 
   local safety = 0.015
   if lead > travelTime - safety then
-    lead = math.max(cfg_rtMinLead, travelTime - safety)
+    lead = math.max(minLead, travelTime - safety)
   end
   return lead
 end
 
 local function GetVerifyDelay()
+  -- Note: this clamps to 0.15 by design (original behavior)
   return math.max(0.15, math.min(0.14, pingSec * 1.2 + 0.035))
 end
 
@@ -332,7 +268,7 @@ local function DropTranquils(now, priority)
   if not HasTranquils() then return false end
 
   if (not priority) and (now - lastOrderTime < ORDER_COOLDOWN) then return false end
-  if now - lastDropAttempt < cfg_minDropInterval then return false end
+  if now - lastDropAttempt < (ADV_MinDropInterval:Get() * 0.001) then return false end
 
   local tranquil = NPC.GetItem(hero, "item_tranquil_boots")
   local cooldown = Ability.GetCooldown(tranquil)
@@ -378,8 +314,6 @@ local function FindDroppedTranquils()
   end
   if best then
     itemEntity = best
-    local it = PhysicalItem.GetItem(best)
-    itemIndex = it and Entity.GetIndex(it) or nil
     return true
   end
   return false
@@ -415,8 +349,8 @@ script.OnProjectile = function(data)
   local now = GameRules.GetGameTime()
   if not hero then return end
 
-  if cfg_disableAfter and now >= cfg_disableAtTime then return end
-  if not cfg_enabled then return end
+  if DisableAfterToggle:Get() and now >= (DisableAfter:Get() * 60) then return end
+  if not Toggle:Get() then return end
 
   local target = data.target
   if not target or target ~= hero then return end
@@ -428,7 +362,7 @@ script.OnProjectile = function(data)
   local projPos = GetProjectilePos(data)
   local srcPos = (not projPos) and Entity.GetAbsOrigin(source) or nil
   local distance = heroPos:Distance(projPos or srcPos)
-  if distance <= cfg_ignoreRadius then return end
+  if distance <= IgnoreRadius:Get() then return end
 
   if LogProjectiles:Get() then
     print(string.format("[Proj] %s->me spd=%s dst=%.0f",
@@ -445,7 +379,8 @@ script.OnProjectile = function(data)
       or (now + distance / speed)
 
   -- Add window
-  AddWindow(impactTime - cfg_uncertainty, impactTime + cfg_uncertainty)
+  local uncertainty = ADV_UncertaintyBuffer:Get() * 0.001
+  AddWindow(impactTime - uncertainty, impactTime + uncertainty)
 
   -- Only schedule when boots are on hero and idle
   if state ~= STATE_IDLE or not HasTranquils() then return end
@@ -463,8 +398,11 @@ script.OnProjectile = function(data)
   local lead = ComputeLead(travel, count)
   local dropTimeAt = impactTime - lead
 
+  local emergencyWindow = ADV_EmergencyWindow:Get() * 0.001
+  local immediateThreshold = ADV_ImmediateThreshold:Get() * 0.001
+
   -- Emergency: impact soon -> drop right now
-  if travel <= cfg_emergencyWindow then
+  if travel <= emergencyWindow then
     if now - lastImmediateAttempt > 0.010 then
       lastImmediateAttempt = now
       DropTranquils(now, true)
@@ -473,7 +411,7 @@ script.OnProjectile = function(data)
   end
 
   -- Immediate window
-  if dropTimeAt <= now + cfg_immediateThreshold then
+  if dropTimeAt <= now + immediateThreshold then
     if now - lastImmediateAttempt > 0.010 then
       lastImmediateAttempt = now
       DropTranquils(now, true)
@@ -497,9 +435,14 @@ script.OnUpdate = function()
 
   if not hero or not player then return end
 
-  RefreshConfig(gameTime)
-  if not cfg_enabled then return end
-  if cfg_disableAfter and gameTime >= cfg_disableAtTime then return end
+  -- Update ping
+  if gameTime >= nextPingRefresh then
+    nextPingRefresh = gameTime + PING_REFRESH_INTERVAL
+    pingSec = PingCompensation:Get() and GetPingSeconds() or 0
+  end
+
+  if not Toggle:Get() then return end
+  if DisableAfterToggle:Get() and gameTime >= (DisableAfter:Get() * 60) then return end
 
   -- Windows cleanup
   if gameTime >= nextWindowsCleanup then
@@ -534,9 +477,12 @@ script.OnUpdate = function()
           earliestImpactTime = newImpact
           earliestProj.dist0 = d
 
-          if (newImpact - gameTime) <= cfg_emergencyWindow then
+          local emergencyWindow = ADV_EmergencyWindow:Get() * 0.001
+          local immediateThreshold = ADV_ImmediateThreshold:Get() * 0.001
+
+          if (newImpact - gameTime) <= emergencyWindow then
             DropTranquils(gameTime, true)
-          elseif newDropAt <= gameTime + cfg_immediateThreshold then
+          elseif newDropAt <= gameTime + immediateThreshold then
             DropTranquils(gameTime, true)
           elseif dropAt == 0 or newDropAt < dropAt - 0.006 then
             dropAt = newDropAt
@@ -556,7 +502,8 @@ script.OnUpdate = function()
     if idx ~= 0 then
       local ts = windowsStart[idx] - gameTime
       local te = windowsEnd[idx] - gameTime
-      if te > 0 and (ts <= cfg_emergencyWindow or te <= cfg_emergencyWindow) then
+      local emergencyWindow = ADV_EmergencyWindow:Get() * 0.001
+      if te > 0 and (ts <= emergencyWindow or te <= emergencyWindow) then
         DropTranquils(gameTime, true)
       end
     end
@@ -604,9 +551,8 @@ script.OnUpdate = function()
     if HasTranquils() then
       -- Completed cycle
       state = STATE_IDLE
-      itemEntity, itemIndex = nil, nil
-      lastPickupTime = gameTime
-      suppressGuardsUntil = gameTime + cfg_postPickupSuppress
+      itemEntity = nil
+      suppressGuardsUntil = gameTime + (ADV_PostPickupSuppress:Get() * 0.001)
       ClearCycle(gameTime)
       DebugLog("Pickup verified")
     elseif retryTime > 0 and gameTime >= retryTime then
@@ -634,7 +580,7 @@ local blocked_orders = {
 }
 
 script.OnPrepareUnitOrders = function(order)
-  if not cfg_enabled or not cfg_blockOrders then return end
+  if not Toggle:Get() or not BlockOrders:Get() then return end
   if state == STATE_IDLE then return end
   if order.order == Enum.UnitOrder.DOTA_UNIT_ORDER_PICKUP_ITEM then
     return true

@@ -40,7 +40,7 @@ script.OnUnitAnimation = function(data)
 
   local target = NPC.FindFacing(npc, Enum.TeamType.TEAM_ENEMY, baseRange + 100, 90,
     { NPCs.GetAll(Enum.UnitTypeFlags.TYPE_HERO) })
-  if not target then return end
+  if not target or not Entity.IsHero(target) then return end
   if Entity.IsDormant and Entity.IsDormant(target) then return end
   if Entity.IsAlive and not Entity.IsAlive(target) then return end
 

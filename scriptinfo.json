@@ -33,11 +33,11 @@
 	},
 	"Auto Interrupt Channeling": {
 		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Interrupt%20Channeling.lua",
-		"hero": "Universal",
-		"description_ru": "Автоматически прерывает прерываемые способности врагов.",
-		"description_en": "Automatically interrupts enemy channeling abilities.",
-		"location_ru": "Общее -> Авто-дизейблер",
-		"location_en": "General -> Auto-disabler"
+		"hero": "Brewmaster",
+		"description_ru": "Автоматически прерывает прерываемые способности врагов с помощью духов.",
+		"description_en": "Automatically interrupts enemy channeling abilities using spirits.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
 	},
 	"Auto Stance": {
 		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Stance.lua",
@@ -280,3 +280,4 @@
 		"location_en": "General"
 	}
 }
+

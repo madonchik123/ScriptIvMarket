@@ -1,0 +1,282 @@
+{
+	"Tinker": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Tinker.lua",
+		"hero": "Tinker",
+		"description_ru": "Скрипт для Tinker.",
+		"description_en": "Script for Tinker.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Armlet Threshold": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Armlet%20Threshold.lua",
+		"hero": "Universal",
+		"description_ru": "Автоматически изменяет порог абуза в зависимости от макс урона тычки и макс урона скиллов.",
+		"description_en": "Automatically changes the abuse threshold depending on the maximum hit damage and the maximum spell damage.",
+		"location_ru": "Другое -> Армлет Абуз -> Auto Threshold",
+		"location_en": "Other -> Armlet Abuse -> Auto Threshold"
+	},
+	"Advanced Wisdom Info": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Wisdom%20Shrine.lua",
+		"hero": "Universal",
+		"description_ru": "Показывает, сколько опыта и уровней получит герой после захвата алтаря мудрости.",
+		"description_en": "Shows how much experience and how many levels a hero will gain after capturing a Shrine of Wisdom.",
+		"location_ru": "Информация -> Глобальная информация -> Настройки мира -> Advanced Wisdom Capture info",
+		"location_en": "Information -> Global information -> World settings -> Advanced Wisdom Capture info"
+	},
+	"armlet": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/armlet.lua",
+		"hero": "Universal",
+		"description_ru": "Улучшенный абуз армлета. Не реагирует на атаки с модификаторами, учитывает снаряды способностей.",
+		"description_en": "Improved Armlet abuse. Does not react to attacks with modifiers, accounts for spell projectiles.",
+		"location_ru": "Прочее -> В игре -> Абуз армлета -> Включить фикс для абуза армлета",
+		"location_en": "Other -> In game -> Armlet abuse -> Enable fix for Armlet abuse"
+	},
+	"Auto Interrupt Channeling": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Interrupt%20Channeling.lua",
+		"hero": "Universal",
+		"description_ru": "Автоматически прерывает прерываемые способности врагов.",
+		"description_en": "Automatically interrupts enemy channeling abilities.",
+		"location_ru": "Общее -> Авто-дизейблер",
+		"location_en": "General -> Auto-disabler"
+	},
+	"Auto Stance": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto%20Stance.lua",
+		"hero": "Troll Warlord",
+		"description_ru": "Авто изменение стойки у Troll Warlord. Рассчитывается по нескольким условиям.",
+		"description_en": "Automatic stance switching for Troll Warlord. Calculated based on several conditions.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"blink_spammer": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/blink_spammer.lua",
+		"hero": "Universal",
+		"description_ru": "При зажатии бинда блинка, спамит его в ту точку.",
+		"description_en": "When holding the blink bind, it spams it to that point.",
+		"location_ru": "Прочее -> в игре",
+		"location_en": "Other -> in game"
+	},
+	"Creep Agro Timer": {
+		"url": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/Creep%20Agro%20Timer.lua",
+		"hero": "Universal",
+		"description_ru": "Таймер агра крипов. Показывает приблизительное место где будут крипы после агра.",
+		"description_en": "Creep aggro timer. Shows an approximate position where creeps will be after aggro.",
+		"location_ru": "Крипы -> Aggro Timer -> Включить таймер агра крипов",
+		"location_en": "Creeps -> Aggro Timer -> Enable creep aggro timer"
+	},
+	"Currier_saver": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Currier_saver.lua",
+		"hero": "Universal",
+		"description_ru": "При обнаружении врага рядом, отводит курьера на фонтан/в умную позицию.",
+		"description_en": "When an enemy is detected nearby, it sends the courier back to the fountain/to a smart position.",
+		"location_ru": "Прочее -> В игре -> Курьер",
+		"location_en": "Other -> In game -> Courier"
+	},
+	"damage_calculators": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/damage_calculators.lua",
+		"hero": "Lina, Skywrath Mage, Void Spirit",
+		"description_ru": "Скрипт расчитывает урон с прокаста в комбо, учитывая предметы, барьеры, сопротивление магии.",
+		"description_en": "The script calculates combo burst damage, taking into account items, barriers, enemy magic resistance.",
+		"location_ru": "Скрипты -> Утилиты -> Damage Calculator",
+		"location_en": "Scripts -> Utilities -> Damage Calculator"
+	},
+	"meepo": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/meepo.lua",
+		"hero": "Meepo",
+		"description_ru": "Скрипт на побег мипо в комбо. Если у одного из мипарей будет низкий % HP, отдается приказ бежать на базу.",
+		"description_en": "Script for Meepo escape in combo. If one Meepo has low HP, it is ordered to run to base.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"meepo_poof": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/meepo_poof.lua",
+		"hero": "Meepo",
+		"description_ru": "Скрипт на фарм пуфами мипо. Находит 2 ближайших кемпа, идет в середину и пуфается.",
+		"description_en": "Script for farming with Meepo poofs. Finds 2 closest camps, moves to midpoint and poofs.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"notifi": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/notifi.lua",
+		"hero": "Universal",
+		"description_ru": "Скрипт на уведомления. Создает notifi.txt где можно вписать текст и время для уведомлений.",
+		"description_en": "Notification script. Creates notifi.txt where you can enter text and timings for notifications.",
+		"location_ru": "Всегда активен",
+		"location_en": "Always active"
+	},
+	"Nt": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/nt.lua",
+		"hero": "Universal",
+		"description_ru": "Рисует телепорты и сканы врагов на карте, а также уведомляет союзников в чате.",
+		"description_en": "Draws enemy teleports and scans on the map and also notifies allies in chat.",
+		"location_ru": "Основные -> info -> Teleport",
+		"location_en": "Main -> info -> Teleport"
+	},
+	"remnant_helper": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/remnant_helper.lua",
+		"hero": "Ember Spirit",
+		"description_ru": "При касте ремнанта за пределами радиуса действия, нажмет его на макс ренжу.",
+		"description_en": "When casting a remnant outside its cast radius, it will activate it at the maximum range.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"sf1000-7": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/sf1000-7.lua",
+		"hero": "Shadow Fiend",
+		"description_ru": "Автоматически нажимает паузу под Requiem combo и пишет '1000-7?'.",
+		"description_en": "Automatically presses pause during the Requiem combo and writes '1000-7?'.",
+		"location_ru": "Список героев -> Shadow Fiend -> Настройки Requiem -> 1000-7 комбо",
+		"location_en": "Hero list -> Shadow Fiend -> Requiem settings -> 1000-7 combo"
+	},
+	"Spirit Breaker": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Spirit%20Breaker.lua",
+		"hero": "Spirit Breaker",
+		"description_ru": "Авто перехват вражеских скиллов с помощью аганима бары.",
+		"description_en": "Automatic interception of enemy spells using Spirit Breaker’s Aghanim.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Techies Mines": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Techies%20Mines.lua",
+		"hero": "Universal",
+		"description_ru": "Автоматически ломает мины Течиса.",
+		"description_en": "Automatically destroys Techies’ mines.",
+		"location_ru": "Общее -> Techies Mines -> Auto Destroy Mines",
+		"location_en": "General -> Techies Mines -> Auto Destroy Mines"
+	},
+	"Translator": {
+		"url": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/translator.lua",
+		"hero": "Universal",
+		"description_ru": "Авто переводчик сообщений. Переводит сообщения от врагов/союзников.",
+		"description_en": "Auto message translator. Translates enemy/ally messages.",
+		"location_ru": "Информация -> Translator -> Enable Translator",
+		"location_en": "Information -> Translator -> Enable Translator"
+	},
+	"Venomancer Ward Controller": {
+		"url": "https://github.com/madonchik123/ScriptIvMarket/raw/refs/heads/main/scripts/Venomancer%20Ward%20Controller.lua",
+		"hero": "Venomancer",
+		"description_ru": "Варды Venomancer автоматически атакуют приоритетные цели (Healing Ward, враги).",
+		"description_en": "Venomancer’s wards automatically attack priority targets (Healing Ward, enemies).",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"auto_bodyguard": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/auto_bodyguard.lua",
+		"hero": "Marci",
+		"description_ru": "Применяет Bodyguard только если союзник атакует вражеского героя.",
+		"description_en": "Casts Bodyguard only when an ally attacks an enemy hero.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Meepo Poof Info": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Meepo%20Poof%20Info.lua",
+		"hero": "Meepo",
+		"description_ru": "Показывает, выживут ли крипы после пуфа главного мипо и его клонов.",
+		"description_en": "Shows whether creeps will survive after a Poof from the main Meepo and his clones.",
+		"location_ru": "Вкладка с героем -> Show if poof is gonna kill creeps",
+		"location_en": "Hero tab -> Show if poof is gonna kill creeps"
+	},
+	"MK_tree": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/MK_tree.lua",
+		"hero": "Monkey King",
+		"description_ru": "Если зажать бинд, автоматически найдёт ближайшее дерево и прыгнет на курсор.",
+		"description_en": "When you hold the bind, it automatically finds the nearest tree and jumps to the cursor.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Remnant Aim": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Remnant%20Aim.lua",
+		"hero": "Void Spirit",
+		"description_ru": "При зажатии бинда автоматически кидает ремнант во врага.",
+		"description_en": "When you hold the bind, it automatically casts Remnant at the enemy.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Phoenix Supernova": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Phoenix_Supernova.lua",
+		"hero": "Phoenix",
+		"description_ru": "Показывает, выживете ли вы после прожатия яйца.",
+		"description_en": "Shows whether you will survive after casting Supernova.",
+		"location_ru": "Вкладка с героем (Show if gonna survive with supernova)",
+		"location_en": "Hero tab (Show if gonna survive with supernova)"
+	},
+	"tusk": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/tusk.lua",
+		"hero": "Tusk",
+		"description_ru": "Комбо Walrus Kick. Блинк -> пинок -> шар.",
+		"description_en": "Walrus Kick combo. Blink -> kick -> snowball.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"agh_dropper": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/agh_dropper.lua",
+		"hero": "Treant Protector",
+		"description_ru": "Быстрое перекладывание аганима на Тренте.",
+		"description_en": "Fast Aghanim swapping for Treant.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"loneDruid_AI": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/loneDruid_AI.lua",
+		"hero": "Lone Druid",
+		"description_ru": "Скрипт на AI медведя. Авто выбор таргета, сбивание кастов, использование предметов.",
+		"description_en": "AI Bear script. Auto target selection, cast interruption, item usage.",
+		"location_ru": "Скрипты -> Другое -> AI медведь",
+		"location_en": "Scripts -> Other -> AI Bear"
+	},
+	"tranquil_abuse": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/tranquil_abuse.lua",
+		"hero": "Universal",
+		"description_ru": "Автоматически выкладывает Tranquil Boots, когда в вас летит вражеский снаряд.",
+		"description_en": "Automatically drops Tranquil Boots when an enemy projectile is flying at you.",
+		"location_ru": "Общее → Основные → Tranquil Abuse",
+		"location_en": "General → Main → Tranquil Abuse"
+	},
+	"Auto_meld": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto_meld.lua",
+		"hero": "Templar Assassin",
+		"description_ru": "Автоматическое использование Meld.",
+		"description_en": "Automatic Meld usage.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Auto_Sunstrike_On_TP": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto_Sunstrike_On_TP.lua",
+		"hero": "Invoker",
+		"description_ru": "Автоматический Sunstrike при телепортации врага.",
+		"description_en": "Automatic Sunstrike on enemy teleport.",
+		"location_ru": "Вкладка с героем",
+		"location_en": "Hero tab"
+	},
+	"Bottle_Tracker": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Bottle_Tracker.lua",
+		"hero": "Universal",
+		"description_ru": "Показывает сколько будет лежать руна в ботле до применения",
+		"description_en": "Tracks how long a rune will stay in the bottle before use.",
+		"location_ru": "Информация",
+		"location_en": "Information"
+	},
+	"Ranks": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Ranks.lua",
+		"hero": "Universal",
+		"description_ru": "Скрипт создает красивую панельку с информацией о том, сколько осталось побед для перехода на следующий ранг.",
+		"description_en": "The script creates a beautiful panel with information about how many wins are left to move to the next rank.",
+		"location_ru": "Информация",
+		"location_en": "Information"
+	},
+	"ActionWheel": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/ActionWheel.lua",
+		"hero": "Universal",
+		"description_ru": "Колесо действий для быстрого доступа к функциям. (Requires KeybindWheel)",
+		"description_en": "Action wheel for quick access to functions. (Requires KeybindWheel)",
+		"location_ru": "Общее",
+		"location_en": "General"
+	},
+	"KeybindWheel": {
+		"url": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/KeybindWheel.lua",
+		"hero": "Universal",
+		"description_ru": "Колесо биндов. (Requirement for ActionWheel)",
+		"description_en": "Keybind wheel. (Requirement for ActionWheel)",
+		"location_ru": "Общее",
+		"location_en": "General"
+	}
+}

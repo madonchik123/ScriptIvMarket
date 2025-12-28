@@ -30,5 +30,8 @@
     "tranquil_abuse": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/tranquil_abuse.lua",
     "Auto_meld": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto_meld.lua",
     "Auto_Sunstrike_On_TP": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Auto_Sunstrike_On_TP.lua",
-    "Bottle_Tracker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Bottle_Tracker.lua"
+    "Bottle_Tracker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Bottle_Tracker.lua",
+    "Ranks": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Ranks.lua",
+    "ActionWheel": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/ActionWheel.lua",
+    "KeybindWheel": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/KeybindWheel.lua"
 }

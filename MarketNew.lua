@@ -4,6 +4,7 @@ local json = require("assets.JSON")
 
 -- Configuration
 local SCRIPTS_JSON_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts.json"
+local SCRIPT_INFO_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scriptinfo.json"
 local MARKET_UPDATE_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/market.lua"
 local CONFIG_FILE = "market"
 
@@ -23,10 +24,12 @@ local ui = {
 local state = {
   isOpen = false,
   scripts = {},
+  scriptInfo = {},
   installed = {},
   status = "",
   statusTime = 0,
   lastMouse = false,
+  language = 0, -- 0 = en, 1 = ru
   popup = {
     isOpen = false,
     message = "",
@@ -60,6 +63,31 @@ local colors = {
 -- Helper Functions
 local function parseJSON(str)
   return json:decode(str)
+end
+
+local function wrapText(text, maxWidth, font, size)
+  if not text or text == "" then return {} end
+  local lines = {}
+  local line = ""
+  for word in text:gmatch("%S+") do
+    local test = line == "" and word or (line .. " " .. word)
+    local w = Render.TextSize(font, size, test).x
+    if w > maxWidth and line ~= "" then
+      table.insert(lines, line)
+      line = word
+    else
+      line = test
+    end
+  end
+  if line ~= "" then table.insert(lines, line) end
+  return lines
+end
+
+local function getDescription(info)
+  if not info then return nil end
+  if state.language == 1 and info.description_ru then return info.description_ru end
+  if state.language == 0 and info.description_en then return info.description_en end
+  return info.description_en or info.description_ru
 end
 
 local function saveScriptsData()
@@ -148,7 +176,7 @@ local function updateMarket()
   end, "update_market")
 end
 
-local function installScript(scriptName, scriptUrl)
+local function installScript(scriptName, scriptUrl, opts)
   setStatus("Installing " .. scriptName .. "...")
   local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
   HTTP.Request("GET", scriptUrl, { headers = headers }, function(response)
@@ -162,10 +190,13 @@ local function installScript(scriptName, scriptUrl)
         saveInstalledScripts()
         setStatus("Installed " .. scriptName)
 
-        state.popup.message = "Installed " .. scriptName .. ", reload scripts?"
-        state.popup.onYes = function() Engine.ReloadScriptSystem() end
-        state.popup.onNo = nil
-        state.popup.isOpen = true
+        local skipReloadPrompt = opts and opts.skipReloadPrompt
+        if not skipReloadPrompt then
+          state.popup.message = "Installed " .. scriptName .. ", reload scripts?"
+          state.popup.onYes = function() Engine.ReloadScriptSystem() end
+          state.popup.onNo = nil
+          state.popup.isOpen = true
+        end
       else
         setStatus("Failed to write file for " .. scriptName)
       end
@@ -192,13 +223,44 @@ local function deleteScript(scriptName)
   end
 end
 
-local function updateAllScripts(calledby)
+local function updateAllScripts(opts)
   setStatus("Updating all scripts...")
   for scriptName, _ in pairs(state.installed) do
     if state.scripts[scriptName] then
-      installScript(scriptName, state.scripts[scriptName])
+      installScript(scriptName, state.scripts[scriptName], opts)
     end
   end
+end
+
+local function setupLanguageListener()
+  local langMenu = Menu.Find("SettingsHidden", "", "", "", "Main", "Language")
+  if not langMenu then return end
+
+  local current = langMenu:Get()
+  if current ~= nil then
+    state.language = current
+  end
+
+  langMenu:SetCallback(function(new)
+    local val = new and new:Get() or 0
+    state.language = val or 0
+  end)
+end
+
+local function fetchScriptInfo()
+  local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
+  HTTP.Request("GET", SCRIPT_INFO_URL, { headers = headers }, function(response)
+    if response.code == 200 and response.response then
+      local success, data = pcall(parseJSON, response.response)
+      if success and data then
+        state.scriptInfo = data
+      else
+        setStatus("Failed to parse script info")
+      end
+    else
+      setStatus("Info fetch failed: " .. tostring(response.code))
+    end
+  end, "fetch_scriptinfo")
 end
 
 local function fetchScriptsData()
@@ -215,7 +277,7 @@ local function fetchScriptsData()
 
         -- Auto-update installed scripts
         if next(state.installed) ~= nil and not Engine.IsInGame() then
-          updateAllScripts()
+          updateAllScripts({ skipReloadPrompt = true })
         end
       else
         setStatus("Failed to parse JSON")
@@ -383,7 +445,7 @@ function Market.OnFrame()
   -- Update All Button (if installed tab)
   if ui.activeTab == "installed" then
     DrawButton("Update All", Vec2(ui.pos.x + ui.size.x - 140, tabY), Vec2(120, tabH), colors.success, nil, function()
-      updateAllScripts(true)
+      updateAllScripts({ skipReloadPrompt = true })
     end)
   end
 
@@ -391,7 +453,7 @@ function Market.OnFrame()
   local listY = tabY + tabH + 15
   local listH = ui.size.y - (listY - ui.pos.y) - 40
   local listW = ui.size.x - 40
-  local itemH = 50
+  local itemH = 110
 
   -- Filter and Sort
   local items = {}
@@ -458,7 +520,26 @@ function Market.OnFrame()
 
       Render.FilledRect(itemPos, Vec2(itemPos.x + itemSize.x, itemPos.y + itemSize.y), Color(30, 30, 30, 255), 4)
 
-      Render.Text(fonts.bold, 18, item.name, Vec2(itemPos.x + 15, itemPos.y + 15), colors.text)
+      local textX = itemPos.x + 15
+      local textY = itemPos.y + 15
+      local info = state.scriptInfo[item.name]
+
+      Render.Text(fonts.bold, 18, item.name, Vec2(textX, textY), colors.text)
+      textY = textY + 21
+
+      if info and info.hero then
+        Render.Text(fonts.regular, 14, "Hero: " .. tostring(info.hero), Vec2(textX, textY), colors.textDim)
+        textY = textY + 18
+      end
+
+      local desc = getDescription(info)
+      if desc then
+        local contentWidth = itemSize.x - 100 - 50 -- leave space for button and margins
+        local lines = wrapText(desc, contentWidth, fonts.regular, 13)
+        for i, line in ipairs(lines) do
+          Render.Text(fonts.regular, 13, line, Vec2(textX, textY + (i - 1) * 16), colors.textDim)
+        end
+      end
 
       local btnW = 100
       local btnH = 30
@@ -499,6 +580,8 @@ end
 Market.OnScriptsLoaded = function()
   loadScriptsData()
   loadInstalledScripts()
+  setupLanguageListener()
+  fetchScriptInfo()
   fetchScriptsData()
 end
 

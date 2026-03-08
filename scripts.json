@@ -33,5 +33,6 @@
     "Bottle_Tracker": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Bottle_Tracker.lua",
     "Ranks": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/Ranks.lua",
     "ActionWheel": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/ActionWheel.lua",
-    "KeybindWheel": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/KeybindWheel.lua"
+    "KeybindWheel": "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/KeybindWheel.lua",
+    "Earth:" "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts/earth.lua" 
 }

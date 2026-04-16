@@ -3,76 +3,89 @@ local Market = {}
 local json = require("assets.JSON")
 
 -- Configuration
-local SCRIPTS_JSON_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts.json"
-local SCRIPT_INFO_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scriptinfo.json"
-local MARKET_UPDATE_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/market.lua"
-local CONFIG_FILE = "market"
+local SCRIPTS_JSON_URL  = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scripts.json"
+local SCRIPT_INFO_URL   = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/scriptinfo.json"
+local MARKET_UPDATE_URL = "https://raw.githubusercontent.com/madonchik123/ScriptIvMarket/refs/heads/main/MarketNew.lua"
+local CONFIG_FILE       = "market"
 
--- UI Configuration
+local SCROLL_SPEED = 40
+local ITEM_H       = 100
+local ITEM_GAP     = 6
+
+-- UI state
 local ui = {
-  pos = Vec2(300, 200),
-  size = Vec2(700, 500),
-  dragging = false,
-  dragOffset = Vec2(0, 0),
-  activeTab = "browse", -- "browse" or "installed"
-  scroll = 0,
-  maxScroll = 0,
-  scrollbarDragging = false,
-  scrollbarDragOffset = 0
+  pos              = Vec2(300, 200),
+  size             = Vec2(720, 520),
+  dragging         = false,
+  dragOffset       = Vec2(0, 0),
+  activeTab        = "browse",
+  scroll           = 0,
+  maxScroll        = 0,
+  scrollbarDragging     = false,
+  scrollbarDragOffset   = 0,
 }
 
 local state = {
-  isOpen = false,
-  scripts = {},
-  scriptInfo = {},
-  installed = {},
-  status = "",
-  statusTime = 0,
-  lastMouse = false,
-  language = 0, -- 0 = en, 1 = ru
+  isOpen      = false,
+  scripts     = {},
+  scriptInfo  = {},
+  installed   = {},
+  status      = "",
+  statusTime  = 0,
+  lastMouse   = false,
+  language    = 0,
   popup = {
-    isOpen = false,
-    message = "",
-    onYes = nil,
-    onNo = nil
+    isOpen   = false,
+    message  = "",
+    onYes    = nil,
+    onNo     = nil,
   },
-  drawingPopup = false
+  drawingPopup = false,
 }
 
-local fonts = {
-  regular = nil,
-  bold = nil
+local fonts = { regular = nil, bold = nil }
+
+-- Color palette
+local C = {
+  bg           = Color(16, 16, 20,  245),
+  header       = Color(22, 22, 28,  255),
+  item         = Color(28, 28, 36,  255),
+  itemHover    = Color(36, 36, 46,  255),
+  accent       = Color(56, 152, 220, 255),
+  accentHover  = Color(80, 172, 240, 255),
+  text         = Color(230, 235, 240, 255),
+  textDim      = Color(140, 150, 160, 255),
+  border       = Color(48,  56,  72,  180),
+  button       = Color(44,  54,  72,  220),
+  buttonHover  = Color(58,  70,  92,  255),
+  success      = Color(46,  204, 113, 255),
+  successHov   = Color(64,  220, 130, 255),
+  danger       = Color(220, 70,  55,  255),
+  dangerHov    = Color(240, 90,  70,  255),
+  warn         = Color(240, 180, 40,  255),
+  scrollTrack  = Color(28,  28,  36,  255),
+  scrollThumb  = Color(64,  72,  96,  255),
+  scrollThumbH = Color(88,  100, 130, 255),
+  overlay      = Color(0,   0,   0,   180),
+  separator    = Color(255, 255, 255, 12),
 }
 
--- Colors
-local colors = {
-  bg = Color(18, 18, 18, 250),
-  header = Color(25, 25, 25, 255),
-  accent = Color(52, 152, 219, 255),
-  text = Color(236, 240, 241, 255),
-  textDim = Color(149, 165, 166, 255),
-  border = Color(44, 62, 80, 255),
-  button = Color(44, 62, 80, 200),
-  buttonHover = Color(52, 73, 94, 255),
-  success = Color(46, 204, 113, 255),
-  danger = Color(231, 76, 60, 255),
-  scrollbar = Color(60, 60, 60, 255),
-  scrollbarHover = Color(80, 80, 80, 255)
-}
+-- ── Helpers ──────────────────────────────────────────────────────────────────
 
--- Helper Functions
-local function parseJSON(str)
-  return json:decode(str)
+local function parseJSON(str) return json:decode(str) end
+
+local function tableCount(t)
+  local n = 0
+  for _ in pairs(t) do n = n + 1 end
+  return n
 end
 
 local function wrapText(text, maxWidth, font, size)
   if not text or text == "" then return {} end
-  local lines = {}
-  local line = ""
+  local lines, line = {}, ""
   for word in text:gmatch("%S+") do
     local test = line == "" and word or (line .. " " .. word)
-    local w = Render.TextSize(font, size, test).x
-    if w > maxWidth and line ~= "" then
+    if Render.TextSize(font, size, test).x > maxWidth and line ~= "" then
       table.insert(lines, line)
       line = word
     else
@@ -86,497 +99,517 @@ end
 local function getDescription(info)
   if not info then return nil end
   if state.language == 1 and info.description_ru then return info.description_ru end
-  if state.language == 0 and info.description_en then return info.description_en end
   return info.description_en or info.description_ru
 end
 
+local function setStatus(msg)
+  state.status    = msg
+  state.statusTime = os.clock() + 4
+end
+
+-- ── Persistence ──────────────────────────────────────────────────────────────
+
 local function saveScriptsData()
   if not Config then return end
-  local scriptsList = ""
-  for scriptName, scriptUrl in pairs(state.scripts) do
-    Config.WriteString(CONFIG_FILE, "script_" .. scriptName, scriptUrl)
-    if scriptsList == "" then
-      scriptsList = scriptName
-    else
-      scriptsList = scriptsList .. "," .. scriptName
-    end
+  local list = {}
+  for name, url in pairs(state.scripts) do
+    Config.WriteString(CONFIG_FILE, "script_" .. name, url)
+    table.insert(list, name)
   end
-  Config.WriteString(CONFIG_FILE, "Market_Scripts", scriptsList)
+  Config.WriteString(CONFIG_FILE, "Market_Scripts", table.concat(list, ","))
 end
 
 local function loadScriptsData()
   if not Config then return end
   state.scripts = {}
-  local scriptsList = Config.ReadString(CONFIG_FILE, "Market_Scripts", "")
-  if scriptsList ~= "" then
-    for scriptName in scriptsList:gmatch("([^,]+)") do
-      local scriptUrl = Config.ReadString(CONFIG_FILE, "script_" .. scriptName, "")
-      if scriptUrl ~= "" then
-        state.scripts[scriptName] = scriptUrl
-      end
-    end
-  end
-end
-local function saveInstalledScripts()
-  if not Config then return end
-  for scriptName, _ in pairs(state.installed) do
-    Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "true")
-    Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "true")
-  end
-  for scriptName, _ in pairs(state.scripts) do
-    if not state.installed[scriptName] then
-      Config.WriteString(CONFIG_FILE, "installed_" .. scriptName, "false")
-    end
+  local raw = Config.ReadString(CONFIG_FILE, "Market_Scripts", "")
+  for name in raw:gmatch("([^,]+)") do
+    local url = Config.ReadString(CONFIG_FILE, "script_" .. name, "")
+    if url ~= "" then state.scripts[name] = url end
   end
 end
 
-local function isScriptInstalled(scriptName)
-  local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
-  local file = io.open(filename, "r")
-  if file then
-    file:close()
-    return true
+local function saveInstalledScripts()
+  if not Config then return end
+  -- Collect all names that have ever been tracked (installed + known scripts)
+  local allNames = {}
+  for name in pairs(state.installed) do allNames[name] = true end
+  for name in pairs(state.scripts)   do allNames[name] = true end
+  -- Write definitive state for every name so stale "true" entries get cleared
+  for name in pairs(allNames) do
+    Config.WriteString(CONFIG_FILE, "installed_" .. name,
+      state.installed[name] and "true" or "false")
   end
+end
+
+local function isScriptInstalled(name)
+  local f = io.open(Engine.GetCheatDirectory() .. "/scripts/" .. name .. ".lua", "r")
+  if f then f:close(); return true end
   return false
 end
 
 local function loadInstalledScripts()
   state.installed = {}
-  for scriptName, _ in pairs(state.scripts) do
-    if isScriptInstalled(scriptName) then
-      state.installed[scriptName] = true
+  for name in pairs(state.scripts) do
+    if isScriptInstalled(name) then
+      state.installed[name] = true
     end
   end
 end
 
-local function setStatus(msg)
-  state.status = msg
-  state.statusTime = os.clock() + 3
-end
+-- ── Network ───────────────────────────────────────────────────────────────────
 
--- Network Functions
+local HTTP_HEADERS = { ["User-Agent"] = "Umbrella/1.0", ["Connection"] = "Keep-Alive" }
+
 local function updateMarket()
-  setStatus("Updating market script...")
-  local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
-  HTTP.Request("GET", MARKET_UPDATE_URL, { headers = headers }, function(response)
-    if response.code == 200 and response.response then
-      local filename = Engine.GetCheatDirectory() .. "/scripts/market.lua"
-      local file = io.open(filename, "w")
-      if file then
-        file:write(response.response)
-        file:close()
-        setStatus("Market updated! Reloading...")
+  setStatus("Updating market script…")
+  HTTP.Request("GET", MARKET_UPDATE_URL, { headers = HTTP_HEADERS }, function(r)
+    if r.code == 200 and r.response then
+      local path = Engine.GetCheatDirectory() .. "/scripts/MarketNew.lua"
+      local f = io.open(path, "w")
+      if f then
+        f:write(r.response); f:close()
+        setStatus("Market updated — reloading…")
         Engine.ReloadScriptSystem()
       else
         setStatus("Failed to write market file")
       end
     else
-      setStatus("Update failed: " .. tostring(response.code))
+      setStatus("Update failed: HTTP " .. tostring(r.code))
     end
   end, "update_market")
 end
 
-local function installScript(scriptName, scriptUrl, opts)
-  setStatus("Installing " .. scriptName .. "...")
-  local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
-  HTTP.Request("GET", scriptUrl, { headers = headers }, function(response)
-    if response.code == 200 and response.response then
-      local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
-      local file = io.open(filename, "w")
-      if file then
-        file:write(response.response)
-        file:close()
-        state.installed[scriptName] = true
+local function installScript(name, url, opts)
+  setStatus("Installing " .. name .. "…")
+  HTTP.Request("GET", url, { headers = HTTP_HEADERS }, function(r)
+    if r.code == 200 and r.response then
+      local path = Engine.GetCheatDirectory() .. "/scripts/" .. name .. ".lua"
+      local f = io.open(path, "w")
+      if f then
+        f:write(r.response); f:close()
+        state.installed[name] = true
         saveInstalledScripts()
-        setStatus("Installed " .. scriptName)
-
-        local skipReloadPrompt = opts and opts.skipReloadPrompt
-        if not skipReloadPrompt then
-          state.popup.message = "Installed " .. scriptName .. ", reload scripts?"
-          state.popup.onYes = function() Engine.ReloadScriptSystem() end
-          state.popup.onNo = nil
-          state.popup.isOpen = true
+        setStatus("Installed: " .. name)
+        if not (opts and opts.skipReloadPrompt) then
+          state.popup.message = "Installed " .. name .. " — reload scripts?"
+          state.popup.onYes   = function() Engine.ReloadScriptSystem() end
+          state.popup.onNo    = nil
+          state.popup.isOpen  = true
         end
       else
-        setStatus("Failed to write file for " .. scriptName)
+        setStatus("Write failed for " .. name)
       end
     else
-      setStatus("Download failed: " .. tostring(response.code))
+      setStatus("Download failed for " .. name .. ": HTTP " .. tostring(r.code))
     end
-  end, "install_" .. scriptName)
+  end, "install_" .. name)
 end
 
-local function deleteScript(scriptName)
-  local filename = Engine.GetCheatDirectory() .. "/scripts/" .. scriptName .. ".lua"
-  local success = os.remove(filename)
-  if success then
-    state.installed[scriptName] = nil
+local function deleteScript(name)
+  local path = Engine.GetCheatDirectory() .. "/scripts/" .. name .. ".lua"
+  if os.remove(path) then
+    state.installed[name] = nil
     saveInstalledScripts()
-    setStatus("Deleted " .. scriptName)
-
-    state.popup.message = "Deleted " .. scriptName .. ", reload scripts?"
-    state.popup.onYes = function() Engine.ReloadScriptSystem() end
-    state.popup.onNo = nil
-    state.popup.isOpen = true
+    setStatus("Deleted: " .. name)
+    state.popup.message = "Deleted " .. name .. " — reload scripts?"
+    state.popup.onYes   = function() Engine.ReloadScriptSystem() end
+    state.popup.onNo    = nil
+    state.popup.isOpen  = true
   else
-    setStatus("Failed to delete " .. scriptName)
+    setStatus("Failed to delete " .. name)
   end
+end
+
+local function updateScript(name)
+  local url = state.scripts[name]
+  if url then installScript(name, url, { skipReloadPrompt = true }) end
 end
 
 local function updateAllScripts(opts)
-  setStatus("Updating all scripts...")
-  for scriptName, _ in pairs(state.installed) do
-    if state.scripts[scriptName] then
-      installScript(scriptName, state.scripts[scriptName], opts)
+  setStatus("Updating all installed scripts…")
+  for name in pairs(state.installed) do
+    if state.scripts[name] then
+      installScript(name, state.scripts[name], opts)
     end
   end
 end
 
-local function setupLanguageListener()
-  local langMenu = Menu.Find("SettingsHidden", "", "", "", "Main", "Language")
-  if not langMenu then return end
-
-  local current = langMenu:Get()
-  if current ~= nil then
-    state.language = current
-  end
-
-  langMenu:SetCallback(function(new)
-    local val = new and new:Get() or 0
-    state.language = val or 0
-  end)
-end
-
 local function fetchScriptInfo()
-  local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
-  HTTP.Request("GET", SCRIPT_INFO_URL, { headers = headers }, function(response)
-    if response.code == 200 and response.response then
-      local success, data = pcall(parseJSON, response.response)
-      if success and data then
+  HTTP.Request("GET", SCRIPT_INFO_URL, { headers = HTTP_HEADERS }, function(r)
+    if r.code == 200 and r.response then
+      local ok, data = pcall(parseJSON, r.response)
+      if ok and data then
         state.scriptInfo = data
       else
         setStatus("Failed to parse script info")
       end
     else
-      setStatus("Info fetch failed: " .. tostring(response.code))
+      setStatus("Script-info fetch failed: HTTP " .. tostring(r.code))
     end
   end, "fetch_scriptinfo")
 end
 
 local function fetchScriptsData()
-  setStatus("Fetching scripts...")
-  local headers = { ["User-Agent"] = "Umbrella/1.0", ['Connection'] = 'Keep-Alive' }
-  HTTP.Request("GET", SCRIPTS_JSON_URL, { headers = headers }, function(response)
-    if response.code == 200 and response.response then
-      local success, data = pcall(parseJSON, response.response)
-      if success and data then
+  setStatus("Fetching script list…")
+  HTTP.Request("GET", SCRIPTS_JSON_URL, { headers = HTTP_HEADERS }, function(r)
+    if r.code == 200 and r.response then
+      local ok, data = pcall(parseJSON, r.response)
+      if ok and data then
         state.scripts = data
         saveScriptsData()
         loadInstalledScripts()
-        setStatus("Loaded " .. tostring(table.count(state.scripts)) .. " scripts")
-
-        -- Auto-update installed scripts
+        setStatus("Loaded " .. tableCount(state.scripts) .. " scripts")
         if next(state.installed) ~= nil and not Engine.IsInGame() then
           updateAllScripts({ skipReloadPrompt = true })
         end
       else
-        setStatus("Failed to parse JSON")
+        setStatus("Failed to parse scripts JSON")
       end
     else
-      setStatus("Fetch failed: " .. tostring(response.code))
+      setStatus("Fetch failed: HTTP " .. tostring(r.code))
     end
   end, "fetch_scripts")
 end
 
-function table.count(t)
-  local c = 0
-  for _ in pairs(t) do c = c + 1 end
-  return c
+local function setupLanguageListener()
+  local langMenu = Menu.Find("SettingsHidden", "", "", "", "Main", "Language")
+  if not langMenu then return end
+  local cur = langMenu:Get()
+  if cur ~= nil then state.language = cur end
+  langMenu:SetCallback(function(new)
+    state.language = (new and new:Get()) or 0
+  end)
 end
 
--- UI Rendering
+-- ── Font init ─────────────────────────────────────────────────────────────────
+
 local function InitFonts()
   if not fonts.regular then
-    fonts.regular = Render.LoadFont("Proximanova", Enum.FontCreate.FONTFLAG_NONE, 400)
-    fonts.bold = Render.LoadFont("Proximanova", Enum.FontCreate.FONTFLAG_BOLD, 600)
+    fonts.regular = Render.LoadFont("Proximanova", Enum.FontCreate.FONTFLAG_ANTIALIAS, Enum.FontWeight.NORMAL)
+    fonts.bold    = Render.LoadFont("Proximanova", Enum.FontCreate.FONTFLAG_ANTIALIAS, Enum.FontWeight.BOLD)
   end
+end
+
+-- ── Drawing primitives ────────────────────────────────────────────────────────
+
+local FLAGS_ALL = Enum.DrawFlags.RoundCornersAll
+
+local function FilledRect(pos, size, color, radius, flags)
+  if flags == nil then flags = FLAGS_ALL end
+  Render.FilledRect(pos, pos + size, color, radius or 0, flags)
+end
+
+local function OutlineRect(pos, size, color, radius, thickness, flags)
+  if flags == nil then flags = FLAGS_ALL end
+  Render.Rect(pos, pos + size, color, radius or 0, thickness or 1, flags)
 end
 
 local function IsHovered(pos, size)
-  local mx, my = Input.GetCursorPos()
-  return mx >= pos.x and mx <= pos.x + size.x and my >= pos.y and my <= pos.y + size.y
+  return Input.IsCursorInRect(pos.x, pos.y, size.x, size.y)
 end
 
-local function DrawButton(text, pos, size, color, hoverColor, callback)
+local function DrawButton(text, pos, size, baseColor, hoverColor, callback)
   local hovered = IsHovered(pos, size)
-  local clicked = hovered and Input.IsKeyDown(Enum.ButtonCode.KEY_MOUSE1) and not state.lastMouse
+  local clicked = false
 
   if state.popup.isOpen and not state.drawingPopup then
-    clicked = false
     hovered = false
+  else
+    clicked = hovered and Input.IsKeyDown(Enum.ButtonCode.KEY_MOUSE1) and not state.lastMouse
   end
 
-  local drawColor = hovered and (hoverColor or colors.buttonHover) or (color or colors.button)
+  local col = hovered and (hoverColor or C.buttonHover) or (baseColor or C.button)
+  FilledRect(pos, size, col, 5)
 
-  Render.FilledRect(pos, Vec2(pos.x + size.x, pos.y + size.y), drawColor, 4)
-
-  local textSize = Render.TextSize(fonts.regular, 14, text)
-  local textPos = Vec2(
-    pos.x + (size.x - textSize.x) / 2,
-    pos.y + (size.y - textSize.y) / 2
-  )
-  Render.Text(fonts.regular, 14, text, textPos, colors.text)
+  local ts  = Render.TextSize(fonts.regular, 14, text)
+  local txy = Vec2(pos.x + (size.x - ts.x) * 0.5, pos.y + (size.y - ts.y) * 0.5)
+  Render.Text(fonts.regular, 14, text, txy, C.text)
 
   if clicked and callback then callback() end
   return clicked
 end
 
+-- ── Popup ─────────────────────────────────────────────────────────────────────
+
 local function DrawPopup()
   if not state.popup.isOpen then return end
-
   state.drawingPopup = true
 
-  -- Dim background
-  Render.FilledRect(ui.pos, Vec2(ui.pos.x + ui.size.x, ui.pos.y + ui.size.y), Color(0, 0, 0, 200), 8)
+  -- Full-window dim
+  FilledRect(ui.pos, ui.size, C.overlay, 8)
 
-  -- Popup Box
-  local popupW, popupH = 400, 150
-  local popupPos = Vec2(
-    ui.pos.x + (ui.size.x - popupW) / 2,
-    ui.pos.y + (ui.size.y - popupH) / 2
-  )
+  local pW, pH   = 420, 155
+  local pPos     = Vec2(ui.pos.x + (ui.size.x - pW) * 0.5, ui.pos.y + (ui.size.y - pH) * 0.5)
+  local pSize    = Vec2(pW, pH)
 
-  Render.FilledRect(popupPos, Vec2(popupPos.x + popupW, popupPos.y + popupH), colors.bg, 8)
-  Render.Rect(popupPos, Vec2(popupPos.x + popupW, popupPos.y + popupH), colors.border, 8, 1.0)
+  FilledRect(pPos, pSize, C.bg,     10)
+  OutlineRect(pPos, pSize, C.border, 10, 1)
 
-  -- Message
-  local textSize = Render.TextSize(fonts.regular, 16, state.popup.message)
-  Render.Text(fonts.regular, 16, state.popup.message,
-    Vec2(popupPos.x + (popupW - textSize.x) / 2, popupPos.y + 40), colors.text)
+  local ts = Render.TextSize(fonts.regular, 15, state.popup.message)
+  Render.Text(fonts.regular, 15, state.popup.message,
+    Vec2(pPos.x + (pW - ts.x) * 0.5, pPos.y + 38), C.text)
 
-  -- Buttons
-  local btnW, btnH = 100, 35
-  local btnY = popupPos.y + popupH - 60
-
-  -- Yes Button
-  DrawButton("Yes", Vec2(popupPos.x + 50, btnY), Vec2(btnW, btnH), colors.success, nil, function()
-    state.popup.isOpen = false
-    if state.popup.onYes then state.popup.onYes() end
-  end)
-
-  -- No Button
-  DrawButton("No", Vec2(popupPos.x + popupW - 50 - btnW, btnY), Vec2(btnW, btnH), colors.danger, nil, function()
-    state.popup.isOpen = false
-    if state.popup.onNo then state.popup.onNo() end
-  end)
+  local bW, bH = 110, 36
+  local bY     = pPos.y + pH - 58
+  DrawButton("Yes",
+    Vec2(pPos.x + 50, bY), Vec2(bW, bH),
+    C.success, C.successHov,
+    function() state.popup.isOpen = false; if state.popup.onYes then state.popup.onYes() end end)
+  DrawButton("No",
+    Vec2(pPos.x + pW - 50 - bW, bY), Vec2(bW, bH),
+    C.danger,  C.dangerHov,
+    function() state.popup.isOpen = false; if state.popup.onNo  then state.popup.onNo()  end end)
 
   state.drawingPopup = false
 end
 
--- Create menu structure
+-- ── Menu integration ──────────────────────────────────────────────────────────
+
 local scriptsMenu = Menu.Create("Scripts", "Other", "Market")
-scriptsMenu:Icon("\u{f54e}") -- store
+scriptsMenu:Icon("\u{f54e}")
 
-local mainMenu = scriptsMenu:Create("Main"):Create("General")
+local mainMenu   = scriptsMenu:Create("Main"):Create("General")
+local openButton = mainMenu:Button("Open Market", function() state.isOpen = true end)
+openButton:Icon("\u{f07a}")
 
-local openButton = mainMenu:Button("Open Market", function()
-  state.isOpen = true
-end)
-openButton:Icon("\u{f07a}") -- shopping-cart
+-- ── Main frame ────────────────────────────────────────────────────────────────
 
 function Market.OnFrame()
   if not state.isOpen then return end
   InitFonts()
 
-  local mx, my = Input.GetCursorPos()
+  local cursor    = Vec2(Input.GetCursorPos())
   local leftClick = Input.IsKeyDown(Enum.ButtonCode.KEY_MOUSE1)
 
-  -- Dragging
+  -- ── Drag window ──
   if leftClick and not state.lastMouse then
-    if IsHovered(ui.pos, Vec2(ui.size.x, 50)) then
-      ui.dragging = true
-      ui.dragOffset = Vec2(mx - ui.pos.x, my - ui.pos.y)
+    if Input.IsCursorInRect(ui.pos.x, ui.pos.y, ui.size.x, 52) then
+      ui.dragging   = true
+      ui.dragOffset = cursor - ui.pos
     end
-  elseif not leftClick then
-    ui.dragging = false
   end
+  if not leftClick then ui.dragging = false end
+  if ui.dragging   then ui.pos = cursor - ui.dragOffset end
 
-  if ui.dragging then
-    ui.pos = Vec2(mx - ui.dragOffset.x, my - ui.dragOffset.y)
-  end
+  -- ── Background ──
+  Render.Blur(ui.pos, ui.pos + ui.size, 1.0, 0.85, 10, FLAGS_ALL)
+  FilledRect(ui.pos, ui.size, C.bg,     10)
+  OutlineRect(ui.pos, ui.size, C.border, 10, 1)
 
-  -- Background with Blur
-  Render.Blur(ui.pos, Vec2(ui.pos.x + ui.size.x, ui.pos.y + ui.size.y), 1.0, 1.0, 8)
-  Render.FilledRect(ui.pos, Vec2(ui.pos.x + ui.size.x, ui.pos.y + ui.size.y), colors.bg, 8)
-  Render.Rect(ui.pos, Vec2(ui.pos.x + ui.size.x, ui.pos.y + ui.size.y), colors.border, 8, 1.0)
+  -- ── Header ──
+  local headerH = 52
+  FilledRect(ui.pos, Vec2(ui.size.x, headerH), C.header, 10, Enum.DrawFlags.RoundCornersTop)
+  -- flat bottom edge of header
+  FilledRect(Vec2(ui.pos.x, ui.pos.y + headerH - 8), Vec2(ui.size.x, 8), C.header, 0)
 
-  -- Header
-  local headerH = 60
-  Render.FilledRect(ui.pos, Vec2(ui.pos.x + ui.size.x, ui.pos.y + headerH), colors.header, 8)
-  -- Fix bottom rounding of header
-  Render.FilledRect(Vec2(ui.pos.x, ui.pos.y + headerH / 2), Vec2(ui.pos.x + ui.size.x, ui.pos.y + headerH), colors
-    .header)
+  Render.Text(fonts.bold, 22, "\u{f54e}  Script Market",
+    Vec2(ui.pos.x + 18, ui.pos.y + 15), C.text)
 
-  Render.Text(fonts.bold, 24, "Script Market", Vec2(ui.pos.x + 20, ui.pos.y + 18), colors.text)
+  -- Close button
+  DrawButton("\u{f00d}", Vec2(ui.pos.x + ui.size.x - 38, ui.pos.y + 14), Vec2(24, 24),
+    Color(0, 0, 0, 0), C.danger,
+    function() state.isOpen = false end)
 
-  -- Close Button
-  DrawButton("X", Vec2(ui.pos.x + ui.size.x - 40, ui.pos.y + 15), Vec2(25, 25), Color(0, 0, 0, 0),
-    Color(200, 50, 50, 255), function()
-      state.isOpen = false
-    end)
+  -- ── Tabs ──
+  local tabBarY = ui.pos.y + headerH + 8
+  local tabW, tabH = 130, 30
 
-  -- Tabs
-  local tabW = 120
-  local tabH = 30
-  local tabY = ui.pos.y + headerH + 10
+  local browseCol    = ui.activeTab == "browse"    and C.accent    or C.button
+  local browseHov    = ui.activeTab == "browse"    and C.accentHover or C.buttonHover
+  local installedCol = ui.activeTab == "installed" and C.accent    or C.button
+  local installedHov = ui.activeTab == "installed" and C.accentHover or C.buttonHover
 
-  local browseColor = ui.activeTab == "browse" and colors.accent or colors.button
-  DrawButton("Browse", Vec2(ui.pos.x + 20, tabY), Vec2(tabW, tabH), browseColor, nil, function()
-    ui.activeTab = "browse"
-    ui.scroll = 0
-  end)
+  DrawButton("Browse",    Vec2(ui.pos.x + 18,          tabBarY), Vec2(tabW, tabH),
+    browseCol, browseHov, function() ui.activeTab = "browse";    ui.scroll = 0 end)
+  DrawButton("Installed", Vec2(ui.pos.x + 18 + tabW + 8, tabBarY), Vec2(tabW, tabH),
+    installedCol, installedHov, function() ui.activeTab = "installed"; ui.scroll = 0 end)
 
-  local installedColor = ui.activeTab == "installed" and colors.accent or colors.button
-  DrawButton("Installed", Vec2(ui.pos.x + 30 + tabW, tabY), Vec2(tabW, tabH), installedColor, nil, function()
-    ui.activeTab = "installed"
-    ui.scroll = 0
-  end)
-
-  -- Update All Button (if installed tab)
   if ui.activeTab == "installed" then
-    DrawButton("Update All", Vec2(ui.pos.x + ui.size.x - 140, tabY), Vec2(120, tabH), colors.success, nil, function()
-      updateAllScripts({ skipReloadPrompt = true })
-    end)
+    DrawButton("\u{f021}  Update All",
+      Vec2(ui.pos.x + ui.size.x - 148, tabBarY), Vec2(130, tabH),
+      C.success, C.successHov,
+      function() updateAllScripts({ skipReloadPrompt = true }) end)
   end
 
-  -- Content List
-  local listY = tabY + tabH + 15
-  local listH = ui.size.y - (listY - ui.pos.y) - 40
-  local listW = ui.size.x - 40
-  local itemH = 110
+  -- ── Separator ──
+  local sepY = tabBarY + tabH + 8
+  FilledRect(Vec2(ui.pos.x + 18, sepY), Vec2(ui.size.x - 36, 1), C.separator, 0)
 
-  -- Filter and Sort
+  -- ── Item list ──
+  local listX = ui.pos.x + 16
+  local listY = sepY + 6
+  local listW = ui.size.x - 36
+  local listH = ui.size.y - (listY - ui.pos.y) - 38
+  local itemW = listW
+
+  -- build visible item list
   local items = {}
   if ui.activeTab == "browse" then
     for name, url in pairs(state.scripts) do
       if not state.installed[name] then
-        table.insert(items, { name = name, url = url, type = "install" })
+        table.insert(items, { name = name, url = url, mode = "install" })
       end
     end
   else
-    for name, _ in pairs(state.installed) do
-      table.insert(items, { name = name, type = "uninstall" })
+    for name in pairs(state.installed) do
+      table.insert(items, { name = name, url = state.scripts[name], mode = "installed" })
     end
   end
   table.sort(items, function(a, b) return a.name < b.name end)
 
-  -- Scroll Logic
-  local totalH = #items * (itemH + 5)
-  ui.maxScroll = math.max(0, totalH - listH)
+  local totalH   = #items * (ITEM_H + ITEM_GAP) - ITEM_GAP
+  ui.maxScroll   = math.max(0, totalH - listH)
+  ui.scroll      = math.max(0, math.min(ui.maxScroll, ui.scroll))
 
   -- Scrollbar
+  local sbW = 5
+  local sbX = ui.pos.x + ui.size.x - 14
   if ui.maxScroll > 0 then
-    local scrollbarX = ui.pos.x + ui.size.x - 15
-    local scrollbarY = listY
-    local scrollbarH = listH
-    local thumbH = math.max(30, (listH / totalH) * listH)
-    local thumbY = scrollbarY + (ui.scroll / ui.maxScroll) * (scrollbarH - thumbH)
+    local trackH = listH
+    local thumbH = math.max(28, (listH / totalH) * trackH)
+    local thumbY = listY + (ui.scroll / ui.maxScroll) * (trackH - thumbH)
 
-    -- Scrollbar Track
-    Render.FilledRect(Vec2(scrollbarX, scrollbarY), Vec2(scrollbarX + 6, scrollbarY + scrollbarH), Color(30, 30, 30, 255),
-      3)
+    FilledRect(Vec2(sbX, listY), Vec2(sbW, trackH), C.scrollTrack, 3)
 
-    -- Scrollbar Thumb
-    local thumbColor = ui.scrollbarDragging and colors.scrollbarHover or colors.scrollbar
-    Render.FilledRect(Vec2(scrollbarX, thumbY), Vec2(scrollbarX + 6, thumbY + thumbH), thumbColor, 3)
+    local thumbHov = IsHovered(Vec2(sbX - 4, thumbY), Vec2(sbW + 8, thumbH))
+    FilledRect(Vec2(sbX, thumbY), Vec2(sbW, thumbH),
+      (thumbHov or ui.scrollbarDragging) and C.scrollThumbH or C.scrollThumb, 3)
 
-    -- Dragging Logic
     if leftClick and not state.lastMouse then
-      if IsHovered(Vec2(scrollbarX - 5, scrollbarY), Vec2(16, scrollbarH)) then
-        ui.scrollbarDragging = true
-        ui.scrollbarDragOffset = my - thumbY
+      if Input.IsCursorInRect(sbX - 4, listY, sbW + 8, trackH) then
+        ui.scrollbarDragging    = true
+        ui.scrollbarDragOffset  = cursor.y - thumbY
       end
-    elseif not leftClick then
-      ui.scrollbarDragging = false
     end
-
+    if not leftClick then ui.scrollbarDragging = false end
     if ui.scrollbarDragging then
-      local newThumbY = my - ui.scrollbarDragOffset
-      local trackRatio = (newThumbY - scrollbarY) / (scrollbarH - thumbH)
-      ui.scroll = math.max(0, math.min(ui.maxScroll, trackRatio * ui.maxScroll))
+      local newThumbY  = cursor.y - ui.scrollbarDragOffset
+      local ratio      = (newThumbY - listY) / (trackH - thumbH)
+      ui.scroll        = math.max(0, math.min(ui.maxScroll, ratio * ui.maxScroll))
     end
   end
 
-
-  Render.PushClip(Vec2(ui.pos.x, listY), Vec2(ui.pos.x + ui.size.x, listY + listH))
+  -- Clip to list area
+  Render.PushClip(Vec2(listX - 2, listY), Vec2(listX + itemW + 2, listY + listH))
 
   local startY = listY - ui.scroll
   for i, item in ipairs(items) do
-    local itemY = startY + (i - 1) * (itemH + 5)
+    local iy  = startY + (i - 1) * (ITEM_H + ITEM_GAP)
+    if iy + ITEM_H < listY or iy > listY + listH then goto continue end
 
-    if itemY + itemH > listY and itemY < listY + listH then
-      local itemPos = Vec2(ui.pos.x + 20, itemY)
-      local itemSize = Vec2(listW - 20, itemH)
+    local iPos  = Vec2(listX, iy)
+    local iSize = Vec2(itemW, ITEM_H)
+    local hov   = IsHovered(iPos, iSize) and not (state.popup.isOpen and not state.drawingPopup)
 
-      Render.FilledRect(itemPos, Vec2(itemPos.x + itemSize.x, itemPos.y + itemSize.y), Color(30, 30, 30, 255), 4)
+    FilledRect(iPos, iSize, hov and C.itemHover or C.item, 6)
 
-      local textX = itemPos.x + 15
-      local textY = itemPos.y + 15
-      local info = state.scriptInfo[item.name]
+    local info  = state.scriptInfo[item.name]
+    local tx, ty = iPos.x + 14, iy + 12
 
-      Render.Text(fonts.bold, 18, item.name, Vec2(textX, textY), colors.text)
-      textY = textY + 21
+    -- Script name
+    Render.Text(fonts.bold, 16, item.name, Vec2(tx, ty), C.text)
+    ty = ty + 22
 
-      if info and info.hero then
-        Render.Text(fonts.regular, 14, "Hero: " .. tostring(info.hero), Vec2(textX, textY), colors.textDim)
-        textY = textY + 18
-      end
+    -- Hero tag
+    if info and info.hero then
+      local heroStr = "\u{f007}  " .. tostring(info.hero)
+      Render.Text(fonts.regular, 12, heroStr, Vec2(tx, ty), C.accent)
+      ty = ty + 17
+    end
 
-      local desc = getDescription(info)
-      if desc then
-        local contentWidth = itemSize.x - 100 - 50 -- leave space for button and margins
-        local lines = wrapText(desc, contentWidth, fonts.regular, 13)
-        for i, line in ipairs(lines) do
-          Render.Text(fonts.regular, 13, line, Vec2(textX, textY + (i - 1) * 16), colors.textDim)
-        end
-      end
-
-      local btnW = 100
-      local btnH = 30
-      local btnPos = Vec2(itemPos.x + itemSize.x - btnW - 10, itemPos.y + 10)
-
-      if item.type == "install" then
-        DrawButton("Install", btnPos, Vec2(btnW, btnH), colors.accent, nil, function()
-          installScript(item.name, item.url)
-        end)
-      else
-        DrawButton("Uninstall", btnPos, Vec2(btnW, btnH), colors.danger, nil, function()
-          deleteScript(item.name)
-        end)
+    -- Description (wrapped)
+    local desc = getDescription(info)
+    if desc then
+      local btnReserve = 220
+      local maxW = itemW - btnReserve
+      local lines = wrapText(desc, maxW, fonts.regular, 12)
+      for li, ln in ipairs(lines) do
+        if ty + (li - 1) * 15 + 15 > iy + ITEM_H - 6 then break end
+        Render.Text(fonts.regular, 12, ln, Vec2(tx, ty + (li - 1) * 15), C.textDim)
       end
     end
+
+    -- Action buttons (right side)
+    local bH   = 28
+    local bW1  = 90
+    local bX1  = iPos.x + itemW - bW1 - 10
+    local bY   = iy + (ITEM_H - bH) * 0.5
+
+    if item.mode == "install" then
+      DrawButton("\u{f019}  Install", Vec2(bX1, bY), Vec2(bW1, bH),
+        C.accent, C.accentHover,
+        function() installScript(item.name, item.url) end)
+    else
+      -- Update + Uninstall
+      local bW2 = 90
+      local bX2 = bX1 - bW2 - 6
+      DrawButton("\u{f021}  Update", Vec2(bX2, bY), Vec2(bW2, bH),
+        C.button, C.buttonHover,
+        function() updateScript(item.name) end)
+      DrawButton("\u{f1f8}  Remove", Vec2(bX1, bY), Vec2(bW1, bH),
+        C.danger, C.dangerHov,
+        function() deleteScript(item.name) end)
+    end
+
+    ::continue::
   end
+
   Render.PopClip()
 
-  -- Status Bar
-  if state.status ~= "" then
-    Render.Text(fonts.regular, 14, state.status, Vec2(ui.pos.x + 20, ui.pos.y + ui.size.y - 25), colors.textDim)
-    if os.clock() > state.statusTime then state.status = "" end
+  -- ── Empty-state message ──
+  if #items == 0 then
+    local msg = ui.activeTab == "browse" and "All available scripts are installed!" or "No scripts installed yet."
+    local ts  = Render.TextSize(fonts.regular, 15, msg)
+    Render.Text(fonts.regular, 15, msg,
+      Vec2(ui.pos.x + (ui.size.x - ts.x) * 0.5, listY + listH * 0.5 - ts.y * 0.5),
+      C.textDim)
   end
 
-  -- Update Market Button
-  local updateBtnW = 120
-  DrawButton("Update Market", Vec2(ui.pos.x + ui.size.x - updateBtnW - 20, ui.pos.y + ui.size.y - 35),
-    Vec2(updateBtnW, 25), colors.button, nil, function()
-      updateMarket()
-    end)
+  -- ── Status bar ──
+  local footerY = ui.pos.y + ui.size.y - 30
+  FilledRect(Vec2(ui.pos.x + 1, footerY),
+    Vec2(ui.size.x - 2, 29), C.header, 0, Enum.DrawFlags.RoundCornersBottom)
+
+  if state.status ~= "" then
+    if os.clock() > state.statusTime then
+      state.status = ""
+    else
+      Render.Text(fonts.regular, 13, state.status,
+        Vec2(ui.pos.x + 18, footerY + 8), C.textDim)
+    end
+  end
+
+  -- "Update Market" button bottom-right
+  local ubW = 124
+  DrawButton("\u{f062}  Update Market",
+    Vec2(ui.pos.x + ui.size.x - ubW - 14, footerY + 2), Vec2(ubW, 24),
+    C.button, C.buttonHover,
+    function() updateMarket() end)
 
   DrawPopup()
 
   state.lastMouse = leftClick
 end
 
--- Initialization
+-- ── Mouse-wheel scroll ────────────────────────────────────────────────────────
+
+function Market.OnKeyEvent(data)
+  if not state.isOpen then return true end
+  if data.event == Enum.EKeyEvent.EKeyEvent_KEY_DOWN then
+    if data.key == Enum.ButtonCode.MOUSE_WHEEL_UP then
+      ui.scroll = math.max(0, ui.scroll - SCROLL_SPEED)
+      return false
+    elseif data.key == Enum.ButtonCode.MOUSE_WHEEL_DOWN then
+      ui.scroll = math.min(ui.maxScroll, ui.scroll + SCROLL_SPEED)
+      return false
+    end
+  end
+  return true
+end
+
+-- ── Initialization ────────────────────────────────────────────────────────────
+
 Market.OnScriptsLoaded = function()
   loadScriptsData()
   loadInstalledScripts()

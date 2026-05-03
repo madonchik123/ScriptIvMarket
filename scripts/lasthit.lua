@@ -23,7 +23,8 @@ local OUR_PENDING_HIT_BUFFER_TICKS = 6
 local PREDICTION_EVENT_GRACE_TICKS = 6
 local PREDICTION_CONFIRMED_EVENT_STALE_TICKS = 20
 local PREDICTION_FUTURE_EVENT_EXPIRE_GRACE_TICKS = 3
-local PREDICTION_HEALTH_VALIDATION_SLACK = 2
+local MELEE_HIT_TIME_BUFFER_TICKS = 1
+local PREDICTION_HEALTH_VALIDATION_SLACK = 0
 local PREDICTION_EARLY_SAFETY_TICKS = 0
 local PREDICTION_ISSUE_LEAD_TICKS = 0.25
 local PREDICT_ATTACK_EARLY_WINDOW = 2.00
@@ -31,6 +32,7 @@ local PREDICT_ATTACK_LATE_WINDOW = 2.00
 local PREDICT_READY_MAX_LATE_TICKS = 4
 local PENDING_DIRECT_OVERRIDE_TICKS = 2
 local PREDICT_ATTACK_AFTER_TICKS = 1
+local PREDICT_ATTACK_EDGE_AFTER_EXTRA_TICKS = 1
 local PREDICTION_FUTURE_ATTACK_COUNT = 3
 local PREDICTION_FUTURE_ATTACK_HORIZON = 3.50
 local DENY_BEFORE_LASTHIT_MARGIN_TICKS = 24
@@ -105,9 +107,14 @@ local pending_attack_base_health = nil
 local pending_attack_predicted_health = nil
 local pending_attack_incoming_time = 0
 local pending_attack_events = nil
+local pending_attack_after_ticks = 0
+local pending_attack_attack_delay = 0
 local pending_attack_move_lock_logged = false
 local attack_confirmation_until = 0
 local attack_confirmation_target_index = nil
+local attack_confirmation_target_is_friendly = false
+local attack_confirmation_issue_time = 0
+local attack_confirmation_order_seen = false
 local active_projectiles = {}
 local active_melee_swings = {}
 local creep_attack_clocks = {}
@@ -156,6 +163,19 @@ end
 
 local function get_time()
     return GlobalVars.GetCurTime()
+end
+
+local function safe_call(fn, ...)
+    if type(fn) ~= "function" then
+        return nil
+    end
+
+    local ok, result = pcall(fn, ...)
+    if ok then
+        return result
+    end
+
+    return nil
 end
 
 local function get_tick_interval()
@@ -279,7 +299,17 @@ local function is_actionable_health(creep, health)
 end
 
 local function is_target_actionable_after_hits(creep, health_after_hits)
-    return is_actionable_health(creep, health_after_hits)
+    health_after_hits = tonumber(health_after_hits or 0) or 0
+    if health_after_hits <= 0 then
+        return false
+    end
+
+    if creep.is_friendly then
+        return health_after_hits <= creep.min_damage
+            and is_deniable_health(health_after_hits, creep.max_health)
+    end
+
+    return health_after_hits <= creep.min_damage + PREDICTION_HEALTH_VALIDATION_SLACK
 end
 
 local function get_unit_hit_delay(attacker, target)
@@ -396,6 +426,15 @@ end
 
 local function get_predict_ready_late_limit()
     return get_tick_interval() * PREDICT_READY_MAX_LATE_TICKS
+end
+
+local function get_predict_attack_after_ticks(creep, health_after_hits)
+    local after_ticks = PREDICT_ATTACK_AFTER_TICKS
+    if health_after_hits > creep.min_damage then
+        after_ticks = after_ticks + PREDICT_ATTACK_EDGE_AFTER_EXTRA_TICKS
+    end
+
+    return after_ticks
 end
 
 local function get_pending_direct_override_window()
@@ -669,6 +708,7 @@ local function draw_hit_timer(target_index, label, seconds_left, color, z_offset
 end
 
 local function set_melee_hit_timer(source, target, hit_time)
+    hit_time = ceil_to_tick(hit_time + (get_tick_interval() * MELEE_HIT_TIME_BUFFER_TICKS))
     active_melee_swings[get_entity_index(source)] = {
         source_index = get_entity_index(source),
         target_index = get_entity_index(target),
@@ -776,6 +816,14 @@ local function clear_pending_move()
     pending_move_execute_time = 0
 end
 
+local function clear_attack_confirmation()
+    attack_confirmation_until = 0
+    attack_confirmation_target_index = nil
+    attack_confirmation_target_is_friendly = false
+    attack_confirmation_issue_time = 0
+    attack_confirmation_order_seen = false
+end
+
 local function clear_pending_attack()
     next_attack_schedule_time = 0
     next_attack_ready_time = 0
@@ -787,9 +835,10 @@ local function clear_pending_attack()
     pending_attack_predicted_health = nil
     pending_attack_incoming_time = 0
     pending_attack_events = nil
+    pending_attack_after_ticks = 0
+    pending_attack_attack_delay = 0
     pending_attack_move_lock_logged = false
-    attack_confirmation_until = 0
-    attack_confirmation_target_index = nil
+    clear_attack_confirmation()
 end
 
 local function clear_pending_orders()
@@ -865,6 +914,20 @@ end
 
 local function get_live_friendly_creep_by_index(hero, index)
     return get_live_creep_by_index(hero, index, true)
+end
+
+local function get_current_attack_target_index(unit)
+    local target = safe_call(NPC.GetAttackTarget, unit) or safe_call(Entity.GetAttackTarget, unit)
+    if target and Entity.IsEntity(target) == true then
+        return get_entity_index(target)
+    end
+
+    return nil
+end
+
+local function is_unit_attacking_target(unit, target_index)
+    return safe_call(NPC.IsAttacking, unit) == true
+        and get_current_attack_target_index(unit) == target_index
 end
 
 local function is_valid_creep_target(hero, target, target_is_friendly)
@@ -982,6 +1045,8 @@ local function schedule_attack_target(creep, now)
     pending_attack_predicted_health = nil
     pending_attack_incoming_time = 0
     pending_attack_events = nil
+    pending_attack_after_ticks = 0
+    pending_attack_attack_delay = 0
     pending_attack_move_lock_logged = false
     next_attack_schedule_time = now + ATTACK_ORDER_INTERVAL
     clear_pending_move()
@@ -1006,6 +1071,8 @@ local function schedule_attack_at(prediction, now)
     pending_attack_predicted_health = prediction.health_after_hits
     pending_attack_incoming_time = prediction.incoming_time
     pending_attack_events = prediction.events
+    pending_attack_after_ticks = prediction.after_ticks or PREDICT_ATTACK_AFTER_TICKS
+    pending_attack_attack_delay = prediction.attack_delay or 0
     pending_attack_move_lock_logged = false
     next_attack_schedule_time = now + ATTACK_ORDER_INTERVAL
     if pending_attack_execute_time - now <= get_prediction_move_lock_window() then
@@ -1023,7 +1090,7 @@ local function schedule_attack_at(prediction, now)
         prediction.attack_delay_bias or 0,
         prediction.early_safety or 0,
         get_prediction_issue_lead(),
-        PREDICT_ATTACK_AFTER_TICKS,
+        prediction.after_ticks or PREDICT_ATTACK_AFTER_TICKS,
         get_attack_order_server_delay_ticks(),
         #(prediction.events or {}),
         tostring(ui.tick_delay:Get())
@@ -1031,7 +1098,19 @@ local function schedule_attack_at(prediction, now)
 end
 
 local function execute_attack_target(player, hero, target)
-    Player.PrepareUnitOrders(
+    if Player.AttackTarget then
+        local ok, err = pcall(Player.AttackTarget, player, hero, target, false, true, true, ATTACK_ORDER_ID, false)
+        if ok then
+            return true, nil, "Player.AttackTarget"
+        end
+
+        debug_log(("ATTACK_ORDER_ERROR method=Player.AttackTarget target=%s error=%s"):format(
+            get_debug_target_text(hero, target),
+            tostring(err)
+        ))
+    end
+
+    local ok, err = pcall(Player.PrepareUnitOrders,
         player,
         Enum.UnitOrder.DOTA_UNIT_ORDER_ATTACK_TARGET,
         target,
@@ -1041,11 +1120,17 @@ local function execute_attack_target(player, hero, target)
         hero,
         false,
         false,
-        false,
+        true,
         true,
         ATTACK_ORDER_ID,
         false
     )
+
+    if ok then
+        return true, nil, "Player.PrepareUnitOrders"
+    end
+
+    return false, err, "Player.PrepareUnitOrders"
 end
 
 local will_target_die_before_our_hit
@@ -1110,6 +1195,7 @@ local function issue_attack_target_once(player, hero, target, now, target_is_fri
     local confirmation_timeout = get_attack_confirmation_timeout(hero, target)
     local raw_attack_delay = get_raw_prediction_attack_delay(hero, target)
     local prediction_attack_delay = get_prediction_attack_delay(hero, target)
+    local launch_delay = get_hero_attack_launch_delay(hero, target)
     debug_log(("ISSUE_ATTACK target=%s hero_hit_delay=%.4f predict_delay=%.4f raw_delay=%.4f bias=%.4f early=%.4f lead=%.4f launch_delay=%.4f confirm_timeout=%.4f server_ticks=%.2f attack_delay_ticks=%.2f tick_delay=%s"):format(
         get_debug_target_text(hero, target),
         get_hero_hit_delay(hero, target),
@@ -1118,13 +1204,27 @@ local function issue_attack_target_once(player, hero, target, now, target_is_fri
         get_attack_delay_bias(),
         get_prediction_early_safety(),
         get_prediction_issue_lead(),
-        get_hero_attack_launch_delay(hero, target),
+        launch_delay,
         confirmation_timeout,
         get_attack_order_server_delay_ticks(),
         get_attack_delay_ticks(),
         tostring(ui.tick_delay:Get())
     ))
-    execute_attack_target(player, hero, target)
+    attack_confirmation_order_seen = false
+    local order_ok, order_error, order_method = execute_attack_target(player, hero, target)
+    if not order_ok then
+        debug_log(("ATTACK_ORDER_ERROR method=%s target=%s error=%s"):format(
+            tostring(order_method),
+            get_debug_target_text(hero, target),
+            tostring(order_error)
+        ))
+        return false
+    end
+    debug_log(("ATTACK_ORDER_SENT method=%s target=%s"):format(
+        tostring(order_method),
+        get_debug_target_text(hero, target)
+    ))
+
     last_attack_issue = {
         target_index = get_entity_index(target),
         issue_time = now,
@@ -1135,6 +1235,8 @@ local function issue_attack_target_once(player, hero, target, now, target_is_fri
         remember_our_melee_pending_hit(hero, target, now)
     end
     attack_confirmation_target_index = get_entity_index(target)
+    attack_confirmation_target_is_friendly = target_is_friendly
+    attack_confirmation_issue_time = now
     attack_confirmation_until = now + confirmation_timeout
     next_attack_schedule_time = attack_confirmation_until
     next_move_schedule_time = now
@@ -1146,6 +1248,8 @@ local function issue_attack_target_once(player, hero, target, now, target_is_fri
     pending_attack_predicted_health = nil
     pending_attack_incoming_time = 0
     pending_attack_events = nil
+    pending_attack_after_ticks = 0
+    pending_attack_attack_delay = 0
     pending_attack_move_lock_logged = false
     return true
 end
@@ -1169,6 +1273,8 @@ local function get_future_attack_hit_time(source, target, attack_start)
         end
 
         hit_time = hit_time + (distance_2d(Entity.GetAbsOrigin(source), Entity.GetAbsOrigin(target)) / projectile_speed)
+    else
+        hit_time = hit_time + (get_tick_interval() * MELEE_HIT_TIME_BUFFER_TICKS)
     end
 
     return ceil_to_tick(hit_time)
@@ -1377,7 +1483,8 @@ local function find_incoming_hit_prediction(hero, creeps, now, target_is_friendl
 
                 if is_target_actionable_after_hits(creep, health_after_hits) then
                     local hero_hit_delay = get_prediction_attack_delay(hero, creep.npc)
-                    local wanted_land_time = hit_group.hit_time + (tick * PREDICT_ATTACK_AFTER_TICKS)
+                    local after_ticks = get_predict_attack_after_ticks(creep, health_after_hits)
+                    local wanted_land_time = hit_group.hit_time + (tick * after_ticks)
                     local execute_time = wanted_land_time - hero_hit_delay
                     local timing_error = execute_time - now
                     local execute_late = now - execute_time
@@ -1393,6 +1500,7 @@ local function find_incoming_hit_prediction(hero, creeps, now, target_is_friendl
                             attack_delay_bias = get_attack_delay_bias(),
                             early_safety = get_prediction_early_safety(),
                             events = contributing_events,
+                            after_ticks = after_ticks,
                         }
 
                     if execute_late > get_predict_ready_late_limit() then
@@ -1407,7 +1515,7 @@ local function find_incoming_hit_prediction(hero, creeps, now, target_is_friendl
                                 hero_hit_delay,
                                 get_prediction_early_safety(),
                                 get_prediction_issue_lead(),
-                                PREDICT_ATTACK_AFTER_TICKS,
+                                after_ticks,
                                 #(contributing_events or {})
                             ))
                         end
@@ -1537,7 +1645,7 @@ local function has_valid_prediction_events(hero, target, now, predicted_health, 
         return fail(("incoming_expired age=%.4f"):format(now - incoming_time))
     end
 
-    if predicted_health > min_damage then
+    if predicted_health > min_damage + PREDICTION_HEALTH_VALIDATION_SLACK then
         return fail("predicted_hp_above_min")
     end
     if target_is_friendly and not is_deniable_health(predicted_health, max_health) then
@@ -1706,6 +1814,71 @@ function LASThitv6.OnDraw()
     end
 end
 
+local function handle_attack_confirmation(hero, now)
+    if attack_confirmation_until <= 0 then
+        return false
+    end
+
+    if attack_confirmation_until > now then
+        clear_pending_move()
+        return true
+    end
+
+    local target = get_live_creep_by_index(hero, attack_confirmation_target_index, attack_confirmation_target_is_friendly)
+    local current_attack_target_index = get_current_attack_target_index(hero)
+    local hero_is_attacking = safe_call(NPC.IsAttacking, hero) == true
+    if target and is_unit_attacking_target(hero, attack_confirmation_target_index) then
+        local order_seen = attack_confirmation_order_seen
+        local predicted_hit_delay = last_attack_issue and last_attack_issue.prediction_attack_delay or get_prediction_attack_delay(hero, target)
+        local launch_time = attack_confirmation_issue_time + get_hero_attack_launch_delay(hero, target)
+        local impact_time = attack_confirmation_issue_time + predicted_hit_delay
+        local ready_time = get_next_attack_ready_time(hero, target, launch_time)
+        remember_our_pending_hit(target, impact_time)
+        clear_attack_confirmation()
+        next_attack_ready_time = math.max(next_attack_ready_time, ready_time)
+        next_attack_schedule_time = math.max(now + ATTACK_ORDER_INTERVAL, ready_time)
+        debug_log(("ATTACK_CONFIRMED animation_state target=%s order_seen=%s waited=%.4f impact_in=%.4f ready_in=%.4f"):format(
+            get_debug_target_text(hero, target),
+            tostring(order_seen),
+            now - attack_confirmation_issue_time,
+            impact_time - now,
+            math.max(0, ready_time - now)
+        ))
+        return true
+    end
+
+    local target_text = target and get_debug_target_text(hero, target) or ("index=" .. tostring(attack_confirmation_target_index))
+    local target_hp = target and math.floor((tonumber(Entity.GetHealth(target) or 0) or 0) + 0.5) or -1
+    local target_valid = target and is_valid_creep_target(hero, target, attack_confirmation_target_is_friendly) == true
+    local target_distance = target and distance_2d(Entity.GetAbsOrigin(hero), Entity.GetAbsOrigin(target)) or -1
+    local face_time = target and get_hero_face_time(hero, target) or -1
+    local reason = "no_attack_animation"
+    if not target then
+        reason = "target_dead_or_stale"
+    elseif current_attack_target_index and current_attack_target_index ~= attack_confirmation_target_index then
+        reason = "different_attack_target"
+    elseif attack_confirmation_order_seen ~= true then
+        reason = "order_not_seen"
+    end
+
+    debug_log(("ATTACK_CONFIRM_FAILED target=%s reason=%s order_seen=%s waited=%.4f hero_attacking=%s current_target=%s target_valid=%s hp=%d distance=%.1f face=%.4f"):format(
+        target_text,
+        reason,
+        tostring(attack_confirmation_order_seen),
+        now - attack_confirmation_issue_time,
+        tostring(hero_is_attacking),
+        tostring(current_attack_target_index),
+        tostring(target_valid),
+        target_hp,
+        target_distance,
+        face_time
+    ))
+    clear_attack_confirmation()
+    next_attack_schedule_time = now + ATTACK_ORDER_INTERVAL
+    clear_pending_move()
+    return true
+end
+
 function LASThitv6.OnUpdate()
     if not Engine.IsInGame() then
         clear_pending_orders()
@@ -1736,12 +1909,7 @@ function LASThitv6.OnUpdate()
         return
     end
 
-    if attack_confirmation_until > 0 and attack_confirmation_until <= now then
-        attack_confirmation_until = 0
-        attack_confirmation_target_index = nil
-    end
-    if attack_confirmation_until > 0 then
-        clear_pending_move()
+    if handle_attack_confirmation(hero, now) then
         return
     end
 
@@ -1758,6 +1926,19 @@ function LASThitv6.OnUpdate()
                 local refreshed_prediction = find_incoming_hit_prediction(hero, creeps, now, pending_attack_is_friendly)
                 local has_target_refreshed_prediction = refreshed_prediction
                     and refreshed_prediction.creep.index == pending_attack_target_index
+                local target_min_damage = get_min_attack_damage_vs_target(hero, target)
+                local refreshed_attack_delay = has_target_refreshed_prediction
+                    and (refreshed_prediction.attack_delay or get_prediction_attack_delay(hero, target))
+                    or 0
+                if has_target_refreshed_prediction
+                    and pending_attack_after_ticks > (refreshed_prediction.after_ticks or PREDICT_ATTACK_AFTER_TICKS)
+                    and refreshed_prediction.health_after_hits > target_min_damage
+                then
+                    refreshed_prediction.after_ticks = pending_attack_after_ticks
+                    refreshed_prediction.execute_time = refreshed_prediction.incoming_time
+                        + (get_tick_interval() * pending_attack_after_ticks)
+                        - refreshed_attack_delay
+                end
 
                 local old_execute_in = pending_attack_execute_time - now
                 if is_target_ready_for_action(hero, target, pending_attack_is_friendly)
@@ -1772,17 +1953,42 @@ function LASThitv6.OnUpdate()
                     return
                 end
 
-                if has_target_refreshed_prediction
-                    and refreshed_prediction.execute_time < pending_attack_execute_time - get_tick_interval()
+                local refreshed_execute_delta = has_target_refreshed_prediction
+                    and (refreshed_prediction.execute_time - pending_attack_execute_time)
+                    or 0
+                local tick_interval = get_tick_interval()
+                local should_refresh_pending = has_target_refreshed_prediction
+                    and math.abs(refreshed_execute_delta) > tick_interval
+                local previous_attack_delay = pending_attack_attack_delay > 0
+                    and pending_attack_attack_delay
+                    or refreshed_attack_delay
+                local attack_delay_delta = previous_attack_delay - refreshed_attack_delay
+                if should_refresh_pending
+                    and refreshed_execute_delta > 0
+                    and (attack_delay_delta <= tick_interval
+                        or refreshed_execute_delta > attack_delay_delta + tick_interval)
                 then
-                    local execute_late = now - refreshed_prediction.execute_time
-                    debug_log(("PENDING_REFRESH_PREDICT target=%s old_execute_in=%.4f new_execute_in=%.4f execute_late=%.4f predicted_hp=%d incoming_in=%.4f events=%d"):format(
+                    debug_log(("PENDING_REFRESH_IGNORE_LATER target=%s old_execute_in=%.4f new_execute_in=%.4f execute_delta=%.4f attack_delay_delta=%.4f reason=incoming_time_jitter"):format(
                         get_debug_target_text(hero, target),
                         pending_attack_execute_time - now,
                         refreshed_prediction.execute_time - now,
+                        refreshed_execute_delta,
+                        attack_delay_delta
+                    ))
+                    should_refresh_pending = false
+                end
+                if should_refresh_pending then
+                    local execute_late = now - refreshed_prediction.execute_time
+                    debug_log(("PENDING_REFRESH_PREDICT target=%s old_execute_in=%.4f new_execute_in=%.4f execute_delta=%.4f attack_delay_delta=%.4f execute_late=%.4f predicted_hp=%d incoming_in=%.4f after_ticks=%.2f events=%d"):format(
+                        get_debug_target_text(hero, target),
+                        pending_attack_execute_time - now,
+                        refreshed_prediction.execute_time - now,
+                        refreshed_execute_delta,
+                        attack_delay_delta,
                         execute_late,
                         math.floor(refreshed_prediction.health_after_hits + 0.5),
                         refreshed_prediction.incoming_time - now,
+                        refreshed_prediction.after_ticks or PREDICT_ATTACK_AFTER_TICKS,
                         #(refreshed_prediction.events or {})
                     ))
 
@@ -1916,6 +2122,8 @@ function LASThitv6.OnUpdate()
         pending_attack_predicted_health = nil
         pending_attack_incoming_time = 0
         pending_attack_events = nil
+        pending_attack_after_ticks = 0
+        pending_attack_attack_delay = 0
 
         local can_issue_attack = false
         local skip_reason = "target_dead_or_stale"
@@ -2004,7 +2212,7 @@ function LASThitv6.OnUpdate()
                     incoming_prediction.attack_delay_bias or 0,
                     incoming_prediction.early_safety or 0,
                     get_prediction_issue_lead(),
-                    PREDICT_ATTACK_AFTER_TICKS,
+                    incoming_prediction.after_ticks or PREDICT_ATTACK_AFTER_TICKS,
                     #(incoming_prediction.events or {})
                 ))
                 issue_attack_target_once(player, hero, target, now, incoming_prediction_is_friendly, true)
@@ -2092,9 +2300,8 @@ function LASThitv6.OnProjectile(data)
         end
 
         if attack_confirmation_target_index == target_index then
-            attack_confirmation_until = 0
-            attack_confirmation_target_index = nil
             local ready_time = get_next_attack_ready_time(hero, data.target, now)
+            clear_attack_confirmation()
             next_attack_ready_time = math.max(next_attack_ready_time, ready_time)
             next_attack_schedule_time = math.max(now + ATTACK_ORDER_INTERVAL, ready_time)
             debug_log(("ATTACK_CONFIRMED projectile_sent target=%s ready_in=%.4f"):format(
@@ -2168,6 +2375,29 @@ function LASThitv6.OnProjectile(data)
 
     set_projectile_hit_timer(source, data.target, ceil_to_tick(impact_time))
     remember_next_creep_attack(source, data.target, now - (tonumber(NPC.GetAttackAnimPoint(source) or 0) or 0))
+end
+
+function LASThitv6.OnPrepareUnitOrders(data)
+    if not data or not data.identifier then
+        return true
+    end
+
+    if data.identifier == ATTACK_ORDER_ID then
+        attack_confirmation_order_seen = true
+        debug_log(("ATTACK_ORDER_PREPARED order=%s target=%s queue=%s show=%s"):format(
+            tostring(data.order),
+            data.target and tostring(get_entity_index(data.target)) or "nil",
+            tostring(data.queue),
+            tostring(data.showEffects)
+        ))
+        return true
+    end
+
+    if data.identifier == MOVE_ORDER_ID then
+        return true
+    end
+
+    return true
 end
 
 return LASThitv6
